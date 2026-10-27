@@ -26,6 +26,11 @@ export function getStorageOptions(device: Device): number[] {
   return device.storageGb === null ? [] : [device.storageGb];
 }
 
+export function getDefaultStorage(device: Device): number | null {
+  const options = getStorageOptions(device);
+  return options.length > 0 ? Math.min(...options) : device.storageGb;
+}
+
 export function storageLabel(value: number | null): string {
   return value === null ? "SSD não informado" : value >= 1024 ? `${value / 1024} TB` : `${value} GB`;
 }
@@ -64,10 +69,9 @@ export function recordForConfiguration(data: Dataset, configuration: Configurati
 }
 
 export function parseStorageSelection(value: string | null, device: Device): number | null {
-  if (value === "unknown") return null;
-  if (value === null) return device.storageGb;
+  if (value === null || !/^\d+$/u.test(value)) return getDefaultStorage(device);
   const parsed = Number(value);
-  return getStorageOptions(device).includes(parsed) ? parsed : device.storageGb;
+  return getStorageOptions(device).includes(parsed) ? parsed : getDefaultStorage(device);
 }
 
 /** Export selected records with any SSD reference metadata, including same-model pairs. */

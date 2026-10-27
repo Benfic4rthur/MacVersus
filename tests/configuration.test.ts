@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { dataset } from "../src/data/catalog";
-import { buildCapacityProfile, datasetForSelections, getStorageOptions, parseStorageSelection, recordForConfiguration } from "../src/lib/configuration";
+import { buildCapacityProfile, datasetForSelections, getDefaultStorage, getStorageOptions, parseStorageSelection, recordForConfiguration } from "../src/lib/configuration";
 import type { Device, Workload } from "../src/lib/types";
 
 test("FPS remains a labelled reference when only the selected SSD changes", () => {
@@ -117,12 +117,41 @@ test("selection exports retain tested SSD and reported hardware separately from 
   assert.ok(exported.benchmarks.filter(b => b.deviceId === exported.devices[1].id).every(b => !b.storageReference));
 });
 
-test("storage URLs reject unsupported values without changing the configuration", () => {
+test("valid shared SSD selections are preserved; absent or invalid selections use the smallest option", () => {
   const device = dataset.devices.find(d => d.id === "mbp16-m1max-64")!;
   assert.equal(parseStorageSelection("1024", device), 1024);
-  assert.equal(parseStorageSelection("1234", device), 2048);
-  assert.equal(parseStorageSelection("unknown", device), null);
+  assert.equal(parseStorageSelection("2048", device), 2048);
+  for (const selection of [null, "unknown", "1234", "", "0x800", "NaN", "-512"]) {
+    assert.equal(parseStorageSelection(selection, device), 1024);
+  }
   assert.equal(getStorageOptions(device).includes(256), false);
+  assert.equal(device.storageGb, 2048, "The measured machine keeps its original SSD");
+});
+
+test("default SSD uses the smallest documented capacity without changing source hardware", () => {
+  const max = dataset.devices.find(d => d.id === "mbp16-m1max-64")!;
+  const airLlm = dataset.devices.find(d => d.id === "mba13-m1-16")!;
+  const proLlm = dataset.devices.find(d => d.id === "mbp14-m1pro-16")!;
+  const airM5 = dataset.devices.find(d => d.family === "MacBook Air" && d.chip === "M5")!;
+  assert.equal(getDefaultStorage(max), 1024);
+  assert.equal(getDefaultStorage(airLlm), 128);
+  assert.equal(getDefaultStorage(proLlm), 512);
+  assert.equal(getDefaultStorage(airM5), 512);
+  assert.equal(parseStorageSelection(null, airLlm), 128);
+  assert.equal(parseStorageSelection("unknown", proLlm), 512);
+  assert.equal(airLlm.storageGb, null);
+  assert.equal(proLlm.storageGb, null);
+  assert.equal(max.storageGb, 2048);
+  const reference = recordForConfiguration(dataset, { deviceId: airLlm.id, storageGb: getDefaultStorage(airLlm) }, "llama2-q4-generation")!;
+  assert.deepEqual(reference.storageReference, { testedStorageGb: null, selectedStorageGb: 128 });
+});
+
+test("unlisted storage choices retain known source storage or remain unknown", () => {
+  const source = dataset.devices.find(d => d.id === "mbp16-m1max-64")!;
+  const fixture = { ...source, chip: "Fixture-only chip", specUrl: "https://example.test/unknown-model" };
+  assert.equal(getDefaultStorage(fixture), 2048);
+  assert.equal(getDefaultStorage({ ...fixture, storageGb: null }), null);
+  assert.equal(parseStorageSelection(null, { ...fixture, storageGb: null }), null);
 });
 
 test("radar uses actual capacities and leaves unsupported Intel GPU axis unknown", () => {

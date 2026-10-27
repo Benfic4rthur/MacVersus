@@ -6,8 +6,8 @@ Comparador de configurações de MacBooks, em português, com fotografias oficia
 
 ## O que já funciona
 
-- Seleção encadeada por família, chip, tamanho de tela, GPU, CPU e RAM, com opções de SSD documentadas pela Apple.
-- Preset do exemplo Air M5 24 GB/1 TB contra M1 Max GPU 32/64 GB/1 TB.
+- Seleção encadeada por família, chip, tamanho de tela, GPU, CPU e RAM. Ao escolher um Mac, o menor SSD disponível nas opções documentadas pela Apple já fica selecionado; a pessoa pode mudar a capacidade se quiser.
+- Preset do exemplo Air M5 24 GB contra M1 Max GPU 32/64 GB, também com o menor SSD disponível em cada Mac.
 - Perfil em radar com capacidades reais de CPU, GPU, RAM, SSD e largura de banda. Cada eixo tem escala própria e não representa uma nota de desempenho.
 - Comparação visual de jogos, IA local e aplicativos de criação.
 - FPS, tokens por segundo, tempo de render/exportação e pontuações com unidades explícitas.
@@ -32,6 +32,8 @@ Os números iniciais foram transcritos de testes do Notebookcheck e de relatos i
 Não há geração de FPS ou tokens/s por IA, extrapolação por núcleos de GPU, atribuição de testes de Mac Studio a MacBook Pro ou transferência automática de resultados entre configurações com RAM diferente. Chip, CPU, GPU, memória, família, ano e tamanho do Mac precisam corresponder. Também não há média global misturando jogos e aplicativos.
 
 Para **FPS e tokens/s**, a capacidade do SSD não bloqueia uma medição do mesmo hardware. Um teste com a capacidade selecionada tem prioridade; quando só há um teste com outro SSD ou SSD não informado, o número publicado aparece como referência, acompanhado da capacidade usada na fonte. O hardware original fica preservado nos detalhes e no CSV. Isso não transforma uma capacidade desconhecida em 1 TB nem cria uma nova medição. Testes de disco e dos demais aplicativos, assim como os anúncios de mercado, continuam exigindo correspondência de SSD.
+
+A seleção do visitante usa automaticamente o menor SSD documentado para o Mac, sem exigir esse passo para comparar ou pesquisar ofertas. Links compartilhados preservam uma capacidade válida escolhida explicitamente; links antigos com SSD ausente, inválido ou `unknown` usam o mínimo disponível. Isso não modifica a capacidade registrada no equipamento da fonte.
 
 Crimson Desert, Xcode, DaVinci Resolve, Final Cut, exportação de dados e leitura/gravação de SSD já podem ser selecionados como alvos de pesquisa. A presença no seletor não afirma que exista um benchmark: esses protocolos novos começam sem medição revisada. As 23 medições iniciais são identificadas por máquina, unidade, data e condições; nenhuma delas é uma previsão para os Macs mais recentes.
 

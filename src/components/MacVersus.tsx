@@ -12,7 +12,7 @@ import { RadarProfile } from "./RadarProfile";
 import { OffersPanel } from "./OffersPanel";
 import type { VerifiedOffer } from "@/lib/offer-types";
 import { publicAssetPath, STATIC_PREVIEW_NOTICE } from "@/lib/static-preview";
-import { datasetForSelections, getStorageOptions, parseStorageSelection, recordForConfiguration, storageLabel } from "@/lib/configuration";
+import { datasetForSelections, getDefaultStorage, getStorageOptions, parseStorageSelection, recordForConfiguration, storageLabel } from "@/lib/configuration";
 
 type View = "compare" | "research" | "methodology";
 const categories = [
@@ -121,12 +121,13 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
   function chooseDevice(side: "left" | "right", id: string, storage?: number | null) {
     const device = data.devices.find(d => d.id === id);
     if (!device) return;
-    if (side === "left") { setLeftId(id); setLeftStorage(storage === undefined ? device.storageGb : storage); }
-    else { setRightId(id); setRightStorage(storage === undefined ? device.storageGb : storage); }
+    const selectedStorage = storage ?? getDefaultStorage(device);
+    if (side === "left") { setLeftId(id); setLeftStorage(selectedStorage); }
+    else { setRightId(id); setRightStorage(selectedStorage); }
   }
   function setLlmPreset() { chooseDevice("left", "mba13-m1-16"); chooseDevice("right", "mbp14-m1pro-16"); setCategory("llms"); setTaskId("llama2-q4-generation"); setQuery(""); setNotice("Comparação de IA: MacBook Air M1 e MacBook Pro M1 Pro."); }
-  function userExample() { chooseDevice("left", "mba13-2026-m5-c10-g10-r24", 1024); chooseDevice("right", "mbp16-m1max-64", 1024); setCategory("games"); setTaskId("crimson-desert-1080-medium"); setQuery(""); }
-  function maxExample() { chooseDevice("left", "mbp16-2021-m1-max-c10-g24-r64", 1024); chooseDevice("right", "mbp16-m2max-32", 1024); setTaskId("all"); setQuery(""); }
+  function userExample() { chooseDevice("left", "mba13-2026-m5-c10-g10-r24"); chooseDevice("right", "mbp16-m1max-64"); setCategory("games"); setTaskId("crimson-desert-1080-medium"); setQuery(""); }
+  function maxExample() { chooseDevice("left", "mbp16-2021-m1-max-c10-g24-r64"); chooseDevice("right", "mbp16-m2max-32"); setTaskId("all"); setQuery(""); }
   function exploreSelectedTask() { setResearchTerm(selectedTask ? `${selectedTask.name} ${selectedTask.subtitle}` : query); navigate("research"); }
   async function refreshData() {
     if (staticPreview) { window.location.reload(); return; }
@@ -155,7 +156,7 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
     <div className="app-main"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" onClick={() => setMobileNav(true)} aria-label="Abrir navegação" aria-expanded={mobileNav} aria-controls="app-navigation"><Menu size={21} /></button><span className="topbar-breadcrumb">MacVersus<ChevronRight size={13} /><strong>{view === "compare" ? "Comparador" : view === "research" ? "Explorar fontes" : "Metodologia"}</strong></span></div><div className="topbar-actions"><button className="icon-button" onClick={refreshData} disabled={refreshing} aria-label="Atualizar base de medições" title="Consultar a versão mais recente da base revisada"><RefreshCw size={16} className={refreshing ? "spinning" : ""} /></button><span className="evidence-status"><i />Fontes rastreáveis</span><button className="outline-button share-button" onClick={share} disabled={!left || !right}><Share2 size={15} /><span>Compartilhar</span></button></div></header>
       <main id="main-content" className={`content view-${view}`}>
         {staticPreview && <div className="preset-notice" role="note"><Info size={17} /><div><strong>{STATIC_PREVIEW_NOTICE}</strong></div></div>}
-        {view === "compare" && <><section className="hero"><div><div className="section-eyebrow"><span className="beta-badge">BETA</span> COMPARAÇÃO DE CONFIGURAÇÕES</div><h1>Compare configurações<span>.</span></h1><p>Escolha chip, GPU, memória e SSD. Consulte os testes da sua tarefa, com a fonte ao lado.</p></div><div className="hero-data"><span className="hero-data-icon"><Layers3 size={23} /></span><div><strong>{data.devices.length}</strong><span>configurações no catálogo</span></div><div className="hero-data-divider" /><div><strong>{data.benchmarks.length}</strong><span>medições com fonte</span></div></div></section>
+        {view === "compare" && <><section className="hero"><div><div className="section-eyebrow"><span className="beta-badge">BETA</span> COMPARAÇÃO DE CONFIGURAÇÕES</div><h1>Compare configurações<span>.</span></h1><p>Escolha chip, GPU e memória. Consulte os testes da sua tarefa, com a fonte ao lado.</p></div><div className="hero-data"><span className="hero-data-icon"><Layers3 size={23} /></span><div><strong>{data.devices.length}</strong><span>configurações no catálogo</span></div><div className="hero-data-divider" /><div><strong>{data.benchmarks.length}</strong><span>medições com fonte</span></div></div></section>
           <section className="machine-comparison" aria-label="Escolha dos MacBooks">
             {left ? <DeviceCard device={left} side="left" onPick={() => setPicker("left")} storageGb={leftStorage} storageOptions={getStorageOptions(left)} onStorageChange={setLeftStorage} /> : <EmptyDeviceCard side="left" onPick={() => setPicker("left")} />}
             <button className="swap-button" disabled={!left || !right} onClick={() => { setLeftId(rightId); setRightId(leftId); setLeftStorage(rightStorage); setRightStorage(leftStorage); }} aria-label="Trocar posições dos Macs" title="Trocar posições"><ArrowLeftRight size={20} /></button>
