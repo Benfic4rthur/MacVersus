@@ -40,6 +40,37 @@ test("a validator never promotes incomplete metadata to a documented comparison"
   assert.throws(() => mergeDatasetUpdate(dataset, feedWith("benchmarks", { ...b, missingFields: [] })), /parciais/);
   assert.throws(() => mergeDatasetUpdate(dataset, feedWith("benchmarks", { ...b, reportedHardware: "Memória não informada" })), /memória descrita/);
 });
+test("feeds preserve explicit unknown tested hardware and accept valid source-specific overrides", () => {
+  const b = measurement();
+  for (const provenance of [{ testedStorageGb: 512, testedScreenInches: 14.2 }, { testedStorageGb: null, testedScreenInches: null }]) {
+    const result = mergeDatasetUpdate(dataset, feedWith("benchmarks", { ...b, ...provenance }));
+    const updated = result.benchmarks.find(item => item.id === b.id)!;
+    assert.equal(updated.testedStorageGb, provenance.testedStorageGb);
+    assert.equal(updated.testedScreenInches, provenance.testedScreenInches);
+    assert.deepEqual(result.devices, dataset.devices);
+  }
+  assert.equal(mergeDatasetUpdate(dataset, feedWith("benchmarks", b)).benchmarks.find(item => item.id === b.id)!.testedStorageGb, undefined);
+});
+
+test("feeds validate provenance numbers and reject runtime reference metadata", () => {
+  const b = measurement();
+  for (const value of [0, -1, 512.5, NaN, Infinity, "1024", {}, true]) {
+    assert.throws(() => mergeDatasetUpdate(dataset, feedWith("benchmarks", { ...b, testedStorageGb: value })), /testedStorageGb/u);
+  }
+  for (const value of [0, -1, NaN, Infinity, "16.2", {}, true]) {
+    assert.throws(() => mergeDatasetUpdate(dataset, feedWith("benchmarks", { ...b, testedScreenInches: value })), /testedScreenInches/u);
+  }
+  for (const runtime of [
+    { storageReference: { testedStorageGb: null, selectedStorageGb: 1024 } },
+    { hardwareReference: { testedMemoryGb: 64, selectedMemoryGb: 32, testedScreenInches: null, selectedScreenInches: 16.2, differences: ["memory", "screen"] } },
+  ]) assert.throws(() => mergeDatasetUpdate(dataset, feedWith("benchmarks", { ...b, ...runtime })), /campo desconhecido/u);
+  for (const provenance of [{ testedStorageGb: null }, { testedScreenInches: null }]) {
+    assert.throws(() => mergeDatasetUpdate(dataset, feedWith("benchmarks", {
+      ...b, ...provenance, quality: "documented", comparabilityKey: "fixture-documented", missingFields: [], conditions: { Version: "1" },
+    })), /desconhecidas/u);
+  }
+});
+
 test("remote fetch URL is restricted to public raw GitHub JSON and cannot request internal servers", () => {
   assert.equal(validateFeedUrl(url), url);
   for (const invalid of ["http://raw.githubusercontent.com/a/b/main/a.json", "https://127.0.0.1/a.json", "https://localhost/a.json", "https://raw.githubusercontent.com.evil.example/a/b/main/a.json", "https://token@raw.githubusercontent.com/a/b/main/a.json", `${url}?token=secret`, "https://raw.githubusercontent.com/a/b/main/a.html"]) assert.throws(() => validateFeedUrl(invalid));

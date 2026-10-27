@@ -27,15 +27,17 @@ Comparador de configurações de MacBooks, em português, com fotografias oficia
 
 **O catálogo de hardware é maior que a base inicial de benchmarks.** A presença de um Mac na lista não significa que exista uma medição publicada para todas as tarefas.
 
-Os números iniciais foram transcritos de testes do Notebookcheck e de relatos identificados na discussão de benchmarks do projeto llama.cpp. As especificações vêm de páginas oficiais da Apple. A base inclui publicações históricas, cuja data permanece visível; a data de consulta não representa uma nova execução do teste.
+Na revisão de 27/10/2026, a base contém **90 medições**: 21 de jogos, 48 de IA local e 21 de aplicativos, em 12 configurações de hardware. As fontes incluem testes próprios de Notebookcheck, Reviewed, The Verge, Digital Trends e MacRumors, além de relatos identificados de llama.cpp, XcodeBenchmark e autores de benchmarks de LLM. As especificações vêm de páginas oficiais da Apple. A base inclui publicações históricas, cuja data permanece visível; a data de consulta não representa uma nova execução do teste.
 
-Não há geração de FPS ou tokens/s por IA, extrapolação por núcleos de GPU, atribuição de testes de Mac Studio a MacBook Pro ou transferência automática de resultados entre configurações com RAM diferente. Chip, CPU, GPU, memória, família, ano e tamanho do Mac precisam corresponder. Também não há média global misturando jogos e aplicativos.
+Não há geração de FPS ou tokens/s por IA, extrapolação por núcleos de GPU nem atribuição de testes de Mac Studio a MacBook Pro. Uma medição da configuração selecionada exige chip, CPU, GPU, RAM, família, ano e tela correspondentes. A opção **Incluir testes de configurações próximas**, ligada inicialmente, também mostra observações do mesmo chip/CPU/GPU/família/ano com outra RAM ou tela, ou tela não informada. Esses números têm o hardware realmente testado identificado junto ao valor; não são medições nem estimativas da configuração selecionada. A preferência pode ser desativada e acompanha o link compartilhado e o CSV.
 
 Para **FPS e tokens/s**, a capacidade do SSD não bloqueia uma medição do mesmo hardware. Um teste com a capacidade selecionada tem prioridade; quando só há um teste com outro SSD ou SSD não informado, o número publicado aparece como referência, acompanhado da capacidade usada na fonte. O hardware original fica preservado nos detalhes e no CSV. Isso não transforma uma capacidade desconhecida em 1 TB nem cria uma nova medição. Testes de disco e dos demais aplicativos, assim como os anúncios de mercado, continuam exigindo correspondência de SSD.
 
 A seleção do visitante usa automaticamente o menor SSD documentado para o Mac, sem exigir esse passo para comparar ou pesquisar ofertas. Links compartilhados preservam uma capacidade válida escolhida explicitamente; links antigos com SSD ausente, inválido ou `unknown` usam o mínimo disponível. Isso não modifica a capacidade registrada no equipamento da fonte.
 
-Crimson Desert, Xcode, DaVinci Resolve, Final Cut, exportação de dados e leitura/gravação de SSD já podem ser selecionados como alvos de pesquisa. A presença no seletor não afirma que exista um benchmark: esses protocolos novos começam sem medição revisada. As 23 medições iniciais são identificadas por máquina, unidade, data e condições; nenhuma delas é uma previsão para os Macs mais recentes.
+O comparador apresenta primeiro os testes com valores disponíveis. Testes sem medição ficam em uma seção expansível, e continuam pesquisáveis. Xcode, Final Cut, Premiere e SSD já têm observações publicadas para parte das configurações. Crimson Desert, DaVinci Resolve e exportação de dados continuam sem medição revisada na base. A presença no seletor não afirma que exista um benchmark.
+
+O par M1 Pro GPU 16/32 GB e M1 Max GPU 32/32 GB tem resultados próprios de jogos. Em Shadow of the Tomb Raider, por exemplo, as fontes usaram resoluções diferentes, mostradas em cada resultado; a tela não calcula um vencedor. Em Llama 2, o M1 Pro de 32 GB tem relato publicado, enquanto a referência disponível para o M1 Max usa 64 GB, identificados explicitamente. Há também resultados próprios de Qwen e Gemma no M1 Max de 32 GB. Modelo, quantização, runtime e etapa permanecem separados.
 
 Um percentual e um vencedor só podem ser exibidos quando os dois registros possuem o mesmo protocolo, condições documentadas e nenhuma informação ausente. Os registros iniciais com condições incompletas permanecem sinalizados como parciais, mesmo quando os números foram publicados. Jogos em Windows/Boot Camp têm esse ambiente identificado e não são tratados como equivalentes aos testes em macOS.
 
@@ -104,10 +106,11 @@ Não há workflows de CI ou GitHub Actions criados neste projeto. O código e a 
 | `src/data/catalog-devices.ts` | Variantes de hardware baseadas em fichas da Apple |
 | `src/data/catalog.ts` | Medições, protocolos e fontes iniciais de Apple Silicon |
 | `src/data/intel-benchmarks.ts` | Medições e ambientes de execução dos Intel |
+| `src/data/game-expansion.ts`, `app-expansion.ts`, `llm-expansion.ts` | Medições adicionais com hardware e condições preservados por fonte |
 | `src/lib/comparison.ts` | Regras de comparabilidade, unidades e CSV |
 | `src/lib/research.ts` | Validação, pesquisa externa, cache e proteção |
 | `src/lib/types.ts` | Contrato dos dados |
-| `src/lib/configuration.ts` | Correspondência de hardware, referências entre SSDs e capacidades do radar |
+| `src/lib/configuration.ts` | Correspondência de hardware, referências explícitas e capacidades do radar |
 | `src/lib/dataset-updates.ts` | Feed revisado, validação e atualização da base |
 | `src/lib/offers.ts` | Correspondência, validade, preços e atualização de anúncios |
 | `src/lib/offer-discovery.ts` | Descoberta opcional, limites e separação dos anúncios candidatos |

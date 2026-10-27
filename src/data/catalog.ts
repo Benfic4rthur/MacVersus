@@ -2,6 +2,9 @@ import type { Benchmark, Dataset, Device, Workload } from "@/lib/types";
 import { mergeDevices } from "./catalog-devices";
 import { intelBenchmarks, intelDevices, intelSources, intelWorkloads } from "./intel-benchmarks";
 import { additionalWorkloads } from "./additional-workloads";
+import { expandedGameBenchmarks, expandedGameSources, expandedGameWorkloads } from "./game-expansion";
+import { expandedAppBenchmarks, expandedAppSources, expandedAppWorkloads } from "./app-expansion";
+import { expandedLlmBenchmarks, expandedLlmSources, expandedLlmWorkloads } from "./llm-expansion";
 
 function device(
   id: string, family: Device["family"], screenInches: number, year: number, chip: string,
@@ -35,7 +38,7 @@ const workloads: Workload[] = [
   { id: "shadow-1080-high", category: "games", name: "Shadow of the Tomb Raider", subtitle: "1080p · Alto · SMAA", metric: "fps", higherIsBetter: true, description: "Média de quadros em 1920 × 1080 com preset High e SMAA. Sistema e modo de execução devem ser conferidos em cada medição." },
   { id: "shadow-1080-highest", category: "games", name: "Shadow of the Tomb Raider", subtitle: "1080p · Máximo · TAA", metric: "fps", higherIsBetter: true, description: "Teste em 1920 × 1080 com preset Highest e TAA." },
   { id: "totalwar-1080-high", category: "games", name: "Total War: Three Kingdoms", subtitle: "1080p · Alto", metric: "fps", higherIsBetter: true, description: "Média de quadros em 1920 × 1080 com preset High, incluindo as texturas." },
-  { id: "llama2-q4-generation", category: "llms", name: "Llama 2 7B", subtitle: "Q4_0 · Geração · Metal", metric: "tokens/s", higherIsBetter: true, description: "Geração de 128 tokens no llama-bench, commit 8e672ef, batch 1 e todas as camadas na GPU. Relatos da comunidade de dezembro de 2023." },
+  { id: "llama2-q4-generation", category: "llms", name: "Llama 2 7B", subtitle: "Q4_0 · Geração · Metal", metric: "tokens/s", higherIsBetter: true, description: "Geração de 128 tokens no llama-bench, batch 1 e todas as camadas na GPU. Cada resultado conserva o commit e as condições publicados pelo autor; builds diferentes não são tratados como um protocolo controlado." },
   { id: "llama2-q8-generation", category: "llms", name: "Llama 2 7B", subtitle: "Q8_0 · Geração · Metal", metric: "tokens/s", higherIsBetter: true, description: "Teste de geração de 128 tokens com quantização Q8_0. A quantização faz parte do protocolo." },
   { id: "llama2-q4-prompt", category: "llms", name: "Llama 2 7B", subtitle: "Q4_0 · Prompt de 512 tokens", metric: "tokens/s", higherIsBetter: true, description: "Processamento de um prompt de 512 tokens no llama-bench. Mede a leitura do prompt, uma etapa distinta da geração de texto." },
   { id: "blender-bmw-cpu", category: "apps", name: "Blender", subtitle: "2.79 · BMW27 · Render por CPU", metric: "seconds", higherIsBetter: false, description: "Tempo de renderização da cena BMW27 pela CPU no Blender 2.79. Valores menores representam menor tempo de espera." },
@@ -126,9 +129,11 @@ for (const machine of llmMachines) {
 
 export const dataset: Dataset = {
   updatedAt: "2026-10-27", devices: mergeDevices(devices, intelDevices),
-  workloads: [...workloads, ...intelWorkloads, ...additionalWorkloads], benchmarks: [...benchmarks, ...intelBenchmarks],
+  workloads: [...workloads, ...intelWorkloads, ...additionalWorkloads, ...expandedGameWorkloads, ...expandedAppWorkloads, ...expandedLlmWorkloads],
+  benchmarks: [...benchmarks, ...intelBenchmarks, ...expandedGameBenchmarks, ...expandedAppBenchmarks, ...expandedLlmBenchmarks],
   sources: [
     ...intelSources,
+    ...expandedGameSources, ...expandedAppSources, ...expandedLlmSources,
     {
       id: "notebookcheck-m1pro", title: "Review do MacBook Pro 16 com M1 Pro (2021)", publisher: "Notebookcheck",
       url: "https://www.notebookcheck.net/Apple-MacBook-Pro-16-2021-M1-Pro-in-Review-The-best-Multimedia-Laptop-for-Content-Creators.579013.0.html",

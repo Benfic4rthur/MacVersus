@@ -52,8 +52,18 @@ export interface Benchmark {
   comparabilityKey: string | null;
   notes: string;
   reportedHardware: string;
+  // Source-specific overrides: undefined inherits Device; null stays unknown.
+  testedStorageGb?: number | null;
+  testedScreenInches?: number | null;
   // Runtime-only reference for FPS/tokens/s; never changes the tested hardware.
   storageReference?: { testedStorageGb: number | null; selectedStorageGb: number | null };
+  hardwareReference?: {
+    testedMemoryGb: number;
+    selectedMemoryGb: number;
+    testedScreenInches: number | null;
+    selectedScreenInches: number;
+    differences: ("memory" | "screen")[];
+  };
 }
 
 export interface Dataset {

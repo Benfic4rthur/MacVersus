@@ -228,7 +228,22 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .task-selector label { color: #7b8795; font-size: 10px; gap: 3px; }
 .task-selector select { color: #344457; font-size: 12px; }
 .task-source-link { color: #2b60bf; font-size: 10px; }
+.related-tests-filter { padding: 0 0 18px; }
+.related-tests-filter label { display: inline-flex; align-items: center; gap: 8px; color: #455770; font-size: 11px; cursor: pointer; }
+.related-tests-filter input { width: 15px; height: 15px; margin: 0; accent-color: #275dcc; }
+.related-tests-filter input:disabled + span { color: #7d8795; }
+.related-tests-filter p { margin: 5px 0 0 23px; color: #627183; font-size: 10px; line-height: 1.65; }
 .results-layout { grid-template-columns: minmax(0, 1fr) 225px; gap: 20px; }
+.results-primary { min-width: 0; }
+.results-primary .benchmark-grid > .empty-state { grid-column: 1 / -1; }
+.unmeasured-tests { margin-top: 18px; border: 1px solid #dfe6ee; border-radius: 8px; background: #f9fbfd; }
+.unmeasured-tests > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 14px; color: #53657a; font-size: 11px; font-weight: 550; list-style: none; cursor: pointer; }
+.unmeasured-tests > summary::-webkit-details-marker { display: none; }
+.unmeasured-tests > summary small { display: inline-block; margin-left: 5px; padding: 1px 6px; border-radius: 4px; background: #eaf0f6; color: #68798c; font-size: 10px; font-weight: 500; }
+.unmeasured-tests > summary svg { transition: transform .18s; }
+.unmeasured-tests[open] > summary svg { transform: rotate(90deg); }
+.unmeasured-tests > p { padding: 0 14px 14px; color: #627183; font-size: 10px; line-height: 1.7; }
+.unmeasured-tests > .benchmark-grid { padding: 0 12px 12px; }
 .benchmark-grid { gap: 14px; }
 .benchmark-card { border-color: var(--line); border-radius: 8px; background: #fff; }
 .benchmark-card-heading { padding: 17px 18px 14px; }
@@ -239,6 +254,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .bar-label small { font-size: 9px; color: #8a94a0; }
 .bar-label strong { font-size: 19px; font-weight: 620; color: #263747; font-variant-numeric: tabular-nums; }
 .bar-label .no-value { font-size: 10px; color: #8a95a1; }
+.benchmark-row .bar-label { align-items: flex-start; }
+.benchmark-value-group { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: 65%; min-width: 0; text-align: right; }
+.benchmark-reference-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 100%; }
+.benchmark-grid > .benchmark-card:only-child { grid-column: 1 / -1; }
+.benchmark-reference-badges > span { padding: 3px 6px; border: 1px solid #e8dbc5; border-radius: 4px; background: #fbf7ef; color: #795c2d; font-size: 9px; font-weight: 500; line-height: 1.5; }
+.benchmark-reference-badges > .benchmark-memory-badge { font-size: 11px; }
+.benchmark-run-conditions { display: flex; flex-wrap: wrap; gap: 2px 6px; margin: 0 0 8px; color: #4c5e77; font-size: 10px; line-height: 1.65; }
+.benchmark-run-conditions > span:first-child { font-weight: 550; }
+.benchmark-run-conditions > span + span::before { content: "·"; padding-right: 6px; color: #94a0ae; }
+.benchmark-tested-hardware { margin-top: 7px; color: #627183; font-size: 9px; line-height: 1.65; }
+.benchmark-row-source { display: inline-flex; align-items: flex-start; gap: 4px; margin-top: 6px; color: #416da7; font-size: 9px; line-height: 1.65; }
+.benchmark-row-source svg { margin-top: 2px; }
+.benchmark-row-source:hover { color: #204fae; text-decoration: underline; }
 .bar-track { height: 8px; border-radius: 2px; background: #edf2f9; }
 .bar-fill { border-radius: 2px; background: #275dcc; }
 .benchmark-right .bar-track { background: #f6f0e5; }
@@ -253,6 +281,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .detail-storage-reference dt { color: #627183; font-size: 10px; }
 .detail-storage-reference dd { margin: 0; color: #344b66; font-size: 11px; text-align: right; }
 .detail-storage-reference > p { color: #627183; font-size: 10px; line-height: 1.7; }
+.detail-column > .benchmark-reference-badges { justify-content: flex-start; margin: 0 0 11px; }
+.detail-reference-table { width: 100%; margin: 10px 0; border-collapse: collapse; font-size: 10px; text-align: left; }
+.detail-reference-table th { color: #627183; font-weight: 550; }
+.detail-reference-table td { color: #344b66; }
+.detail-reference-table th, .detail-reference-table td { padding: 6px 5px; border-bottom: 1px solid #e3e9f0; vertical-align: top; }
+.detail-reference-table th:first-child { padding-left: 0; }
+.detail-reference-table td:last-child { padding-right: 0; }
 .benchmark-card-foot { padding-bottom: 13px; }
 .direction-label { color: #86909d; font-size: 9px; }
 .benchmark-card-foot button { color: #275dcc; font-size: 10px; }
@@ -612,4 +647,5 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .sidebar, .product-photo img, .device-card, .profile-value-row, .radar-series polygon, .radar-series line, .radar-series circle { transition: none; }
+  .unmeasured-tests > summary svg { transition: none; }
 }

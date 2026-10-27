@@ -89,9 +89,11 @@ function parseSource(value: unknown): BenchmarkSource {
   return s as unknown as BenchmarkSource;
 }
 function parseBenchmark(value: unknown): Benchmark {
-  const b = object(value, "benchmark"); keys(b, ["id","deviceId","workloadId","value","sourceId","conditions","quality","missingFields","comparabilityKey","notes","reportedHardware"], "benchmark");
+  const b = object(value, "benchmark"); keys(b, ["id","deviceId","workloadId","value","sourceId","conditions","quality","missingFields","comparabilityKey","notes","reportedHardware","testedStorageGb","testedScreenInches"], "benchmark");
   for (const key of ["id","deviceId","workloadId","sourceId"]) id(b[key], `benchmark.${key}`);
   positive(b.value, `${b.id}.value`); text(b.reportedHardware, `${b.id}.reportedHardware`, 2000);
+  if (b.testedStorageGb !== undefined) nullablePositive(b.testedStorageGb, `${b.id}.testedStorageGb`, true);
+  if (b.testedScreenInches !== undefined) nullablePositive(b.testedScreenInches, `${b.id}.testedScreenInches`);
   if (typeof b.notes !== "string" || b.notes.length > 10000) throw new Error(`${b.id}: notes deve ser texto.`);
   const conditions = object(b.conditions, `${b.id}.conditions`);
   if (Object.keys(conditions).length === 0 || Object.keys(conditions).length > 60) throw new Error(`${b.id}: informe as condições do teste.`);
@@ -99,7 +101,8 @@ function parseBenchmark(value: unknown): Benchmark {
   const missing = strings(b.missingFields, `${b.id}.missingFields`);
   if (b.quality === "documented") {
     text(b.comparabilityKey, `${b.id}.comparabilityKey`, 500);
-    if (missing.length || Object.values(conditions).some(v => unknownText.test(String(v).trim()))) throw new Error(`${b.id}: protocolo documentado não pode ter condições desconhecidas.`);
+    if (missing.length || b.testedStorageGb === null || b.testedScreenInches === null
+      || Object.values(conditions).some(v => unknownText.test(String(v).trim()))) throw new Error(`${b.id}: protocolo documentado não pode ter condições desconhecidas.`);
   } else if (b.quality === "partial") {
     if (!missing.length) throw new Error(`${b.id}: dados parciais exigem missingFields.`);
     if (b.comparabilityKey !== null) text(b.comparabilityKey, `${b.id}.comparabilityKey`, 500);

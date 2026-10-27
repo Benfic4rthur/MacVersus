@@ -8,6 +8,8 @@ O arquivo `src/data/reviewed-updates.json` começa vazio, com `schemaVersion: 1`
 
 Cada medição precisa de hardware exato, teste, valor positivo, condições, fonte HTTPS e descrição do equipamento. Dados desconhecidos devem continuar `null` quando o campo permite, ou ser identificados em `missingFields`. Não use zero para significar ausência. Nos feeds de atualização, registros parciais exigem `quality: "partial"`, `missingFields` preenchido e `comparabilityKey: null`. Algumas entradas históricas da base incluída preservam uma chave nominal; essa chave não autoriza calcular vantagens e não deve ser copiada para novos registros parciais do feed.
 
+Os campos opcionais `testedStorageGb` e `testedScreenInches` preservam a capacidade e a tela efetivamente publicadas para uma observação. Campo ausente herda o dispositivo; `null` significa que a fonte não informou, e nunca deve ser substituído pela configuração do catálogo. Use um novo ID de medição para outro teste em outro SSD. `storageReference` e `hardwareReference` são calculados durante a seleção e são rejeitados no feed. Só FPS de jogos e tokens/s podem aparecer como referências de RAM/tela próximas quando o visitante permite; apps e ofertas continuam exigindo a configuração correspondente.
+
 `quality: "documented"` exige condições conhecidas, nenhuma informação ausente e um protocolo explícito. Um mesmo protocolo não pode representar testes ou condições diferentes. O validador verifica essas regras estruturais. Ele não verifica a veracidade de uma página nem certifica que os testes foram executados: essa conferência permanece responsabilidade do curador.
 
 ## Validação local opcional
@@ -32,7 +34,7 @@ A página usa `loadDataset()` no servidor. `GET /api/benchmarks` também carrega
 
 ## Identidade e correções
 
-IDs de dispositivos não podem mudar chip, CPU, GPU, VRAM, RAM, SSD, tela ou demais características físicas. Crie um novo ID para outra configuração, inclusive ao substituir uma capacidade de SSD desconhecida por uma conhecida. IDs de testes preservam categoria, nome, preset, unidade e direção da métrica. IDs de fontes preservam URL e publicador. IDs de medições preservam os vínculos de hardware, teste e fonte; correções de valor e contexto exigem conferência da evidência original.
+IDs de dispositivos não podem mudar chip, CPU, GPU, VRAM, RAM, SSD, tela ou demais características físicas. Crie um novo ID para outra configuração de processamento ou RAM. Observações do mesmo hardware com SSD diferente devem registrar `testedStorageGb`, sem reescrever o dispositivo; tela não publicada deve registrar `testedScreenInches: null`. IDs de testes preservam categoria, nome, preset, unidade e direção da métrica. IDs de fontes preservam URL e publicador. IDs de medições preservam os vínculos de hardware, teste e fonte; correções de valor e contexto exigem conferência da evidência original.
 
 O feed pode acrescentar dados ao comparador e corrigir registros existentes. Não executa código, não elimina registros antigos, não publica conteúdo e não busca anúncios. A pesquisa na web e a verificação de ofertas continuam integrações separadas.
 

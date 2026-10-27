@@ -5,7 +5,7 @@ import { ArrowLeftRight, ArrowRight, ArrowUpRight, BarChart3, BookOpen, BrainCir
 import type { Benchmark, Category, Dataset, Device, Workload } from "@/lib/types";
 import { buildComparisonCsv, compareBenchmarks, formatValue } from "@/lib/comparison";
 import { DeviceCard, DevicePicker, EmptyDeviceCard, gpuLabel, isIntel } from "./DevicePicker";
-import { BenchmarkCard } from "./BenchmarkCard";
+import { BenchmarkCard, BenchmarkReferenceBadges, benchmarkProtocolDifference } from "./BenchmarkCard";
 import { Dialog } from "./Dialog";
 import { ResearchPanel } from "./ResearchPanel";
 import { RadarProfile } from "./RadarProfile";
@@ -34,6 +34,7 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
   const [detailId, setDetailId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [taskId, setTaskId] = useState("all");
+  const [includeRelated, setIncludeRelated] = useState(true);
   const [researchTerm, setResearchTerm] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [ready, setReady] = useState(false);
@@ -51,6 +52,7 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
     if (tab === "games" || tab === "llms" || tab === "apps") setCategory(tab);
     const task = data.workloads.find(w => w.id === params.get("task") && w.category === tab);
     if (task) setTaskId(task.id);
+    setIncludeRelated(params.get("related") !== "0");
     setReady(true);
   }, [data.devices]);
   useEffect(() => {
@@ -63,8 +65,9 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
     if (leftId || rightId || category !== "games") url.searchParams.set("category", category);
     else url.searchParams.delete("category");
     if (taskId === "all") url.searchParams.delete("task"); else url.searchParams.set("task", taskId);
+    if (includeRelated) url.searchParams.delete("related"); else url.searchParams.set("related", "0");
     window.history.replaceState(null, "", url);
-  }, [leftId, rightId, leftStorage, rightStorage, category, taskId, ready]);
+  }, [leftId, rightId, leftStorage, rightStorage, category, taskId, includeRelated, ready]);
   useEffect(() => { if (notice) { const timeout = window.setTimeout(() => setNotice(""), 4500); return () => window.clearTimeout(timeout); } }, [notice]);
 
   useEffect(() => {
@@ -78,13 +81,23 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
   const rightBase = data.devices.find(d => d.id === rightId);
   const left = leftBase ? { ...leftBase, storageGb: leftStorage } : undefined;
   const right = rightBase ? { ...rightBase, storageGb: rightStorage } : undefined;
-  const workloads = useMemo(() => data.workloads.filter(w => w.category === category && (taskId === "all" || w.id === taskId) && `${w.name} ${w.subtitle}`.toLowerCase().includes(query.toLowerCase())), [data.workloads, category, taskId, query]);
+  const categoryEntries = useMemo(() => data.workloads.filter(workload => workload.category === category).map(workload => {
+    const left = leftId ? recordForConfiguration(data, { deviceId: leftId, storageGb: leftStorage }, workload.id, { includeRelated }) : undefined;
+    const right = rightId ? recordForConfiguration(data, { deviceId: rightId, storageGb: rightStorage }, workload.id, { includeRelated }) : undefined;
+    const rank = left && right ? !left.hardwareReference && !right.hardwareReference ? 0 : 1 : left || right ? 2 : 3;
+    return { workload, left, right, rank };
+  }).sort((a, b) => a.rank - b.rank), [data, category, leftId, leftStorage, rightId, rightStorage, includeRelated]);
+  const workloadEntries = categoryEntries.filter(({ workload }) => (taskId === "all" || workload.id === taskId) && `${workload.name} ${workload.subtitle}`.toLowerCase().includes(query.toLowerCase()));
+  const workloads = workloadEntries.map(entry => entry.workload);
+  const displayedEntries = taskId === "all" ? workloadEntries.filter(entry => entry.left || entry.right) : workloadEntries;
+  const unmeasuredEntries = taskId === "all" ? workloadEntries.filter(entry => !entry.left && !entry.right) : [];
   const measuredDeviceIds = useMemo(() => Array.from(new Set(data.benchmarks.map(b => b.deviceId))), [data.benchmarks]);
-  const categoryWorkloads = data.workloads.filter(w => w.category === category);
-  const getRecord = (device: Device | undefined, workloadId: string) => device ? recordForConfiguration(data, { deviceId: device.id, storageGb: device.storageGb }, workloadId) : undefined;
-  const pairedCount = workloads.filter(w => getRecord(left, w.id) && getRecord(right, w.id)).length;
-  const matchingRecords = workloads.flatMap(w => [getRecord(left, w.id), getRecord(right, w.id)]).filter(Boolean);
-  const hasStorageReferences = matchingRecords.some(record => Boolean(record?.storageReference));
+  const categoryWorkloads = categoryEntries.map(entry => entry.workload);
+  const pairedCount = workloadEntries.filter(entry => entry.left && entry.right).length;
+  const matchingRecords = workloadEntries.flatMap(entry => [entry.left, entry.right]).filter((record): record is Benchmark => Boolean(record));
+  const hardwareReferenceCount = matchingRecords.filter(record => record.hardwareReference).length;
+  const matchingHardwareCount = matchingRecords.length - hardwareReferenceCount;
+  const hasReferences = matchingRecords.some(record => record.storageReference || record.hardwareReference);
   const selectedTask = data.workloads.find(w => w.id === taskId);
   const selectedDetail = data.workloads.find(w => w.id === detailId);
   const availableLlmPreset = data.devices.some(d => d.id === "mba13-m1-16") && data.devices.some(d => d.id === "mbp14-m1pro-16");
@@ -106,12 +119,13 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
     url.searchParams.set("leftSSD", leftStorage === null ? "unknown" : String(leftStorage));
     url.searchParams.set("rightSSD", rightStorage === null ? "unknown" : String(rightStorage));
     if (taskId === "all") url.searchParams.delete("task"); else url.searchParams.set("task", taskId);
+    if (includeRelated) url.searchParams.delete("related"); else url.searchParams.set("related", "0");
     try { await navigator.clipboard.writeText(url.toString()); setNotice("Link da comparação copiado."); }
     catch { setShareFallback(url.toString()); }
   }
   function exportCsv() {
     if (!left || !right) return;
-    const selectionData = datasetForSelections(data, [{ deviceId: leftId, storageGb: leftStorage }, { deviceId: rightId, storageGb: rightStorage }]);
+    const selectionData = datasetForSelections(data, [{ deviceId: leftId, storageGb: leftStorage }, { deviceId: rightId, storageGb: rightStorage }], { includeRelated });
     selectionData.workloads = workloads;
     const blob = new Blob([buildComparisonCsv(selectionData, selectionData.devices[0].id, selectionData.devices[1].id, category)], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob); const link = document.createElement("a");
@@ -163,17 +177,21 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
             {right ? <DeviceCard device={right} side="right" onPick={() => setPicker("right")} storageGb={rightStorage} storageOptions={getStorageOptions(right)} onStorageChange={setRightStorage} /> : <EmptyDeviceCard side="right" onPick={() => setPicker("right")} />}
           </section>
           <div className="example-presets"><span>Experimente</span><button onClick={userExample}>Air M5 24 GB × M1 Max 64 GB</button><button onClick={maxExample}>M1 Max GPU 24 × M2 Max GPU 38</button><button onClick={setLlmPreset}>IA local com medições</button></div>
-          {left && right && hasStorageReferences && <p className="configuration-note"><Info size={14} />FPS e tokens/s podem usar referências do mesmo modelo, chip, CPU, GPU e RAM com SSD diferente ou não informado. A capacidade da fonte aparece no teste.</p>}
+          {left && right && hasReferences && <p className="configuration-note"><Info size={14} />As referências mantêm o resultado original. RAM, tela e SSD usados pela fonte aparecem em cada teste.</p>}
           {(!left || !right) && <p className="selection-hint" role="status">{!left && !right ? "Escolha os dois Macs para começar a comparação." : "Escolha o outro Mac para ver testes, preços e especificações."}</p>}
           {left && right && <>
           <RadarProfile left={left} right={right} />
           <section className="results-section"><div className="results-heading"><div><div className="section-eyebrow">BENCHMARKS</div><h2>Resultados por tarefa.</h2></div><button className="text-button export-button" onClick={exportCsv}><Download size={16} />Exportar dados</button></div>
             <div className="results-toolbar"><div className="category-tabs" role="tablist" aria-label="Categoria de benchmark" onKeyDown={handleTabKey}>{categories.map(({ id, label, icon: Icon }) => <button role="tab" id={`tab-${id}`} aria-controls="benchmark-results" aria-selected={category === id} tabIndex={category === id ? 0 : -1} className={category === id ? "active" : ""} key={id} onClick={() => { setCategory(id); setTaskId("all"); setQuery(""); }}><Icon size={18} />{label}</button>)}</div><label className="search-field workload-search"><Search size={16} /><span className="sr-only">Filtrar testes</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filtrar testes..." />{query && <button onClick={() => setQuery("")} aria-label="Limpar filtro"><X size={14} /></button>}</label></div>
             <div className="task-selector"><label>Escolha o jogo, modelo ou aplicativo<select aria-label="Escolher tarefa" value={taskId} onChange={event => { setTaskId(event.target.value); setQuery(""); }}><option value="all">Todos os testes desta categoria</option>{categoryWorkloads.map(w => <option value={w.id} key={w.id}>{w.name} · {w.subtitle}</option>)}</select></label><button className="text-button" onClick={exploreSelectedTask}><Globe2 size={14} />Buscar novas fontes</button></div>
+            <div className="related-tests-filter"><label><input type="checkbox" checked={category !== "apps" && includeRelated} disabled={category === "apps"} onChange={event => setIncludeRelated(event.target.checked)} /><span>Incluir testes de configurações próximas</span></label><p>{category === "apps" ? "Aplicativos exigem a configuração exata." : "Chip, CPU e GPU coincidem. A RAM e a tela do teste ficam visíveis junto ao resultado."}</p></div>
             {selectedTask?.sourceUrl && <a className="task-source-link" href={selectedTask.sourceUrl} target="_blank" rel="noopener noreferrer">Referência do aplicativo ou protocolo<ArrowUpRight size={12} /></a>}
             {category === "llms" && pairedCount === 0 && availableLlmPreset && <div className="preset-notice"><BrainCircuit size={19} /><div><strong>Há uma comparação de IA disponível na base.</strong><span>MacBook Air M1 (16 GB) e MacBook Pro 14" M1 Pro (16 GB).</span></div><button onClick={setLlmPreset}>Ver comparação<ArrowRight size={15} /></button></div>}
-            <div className="results-layout"><div id="benchmark-results" role="tabpanel" tabIndex={0} aria-labelledby={`tab-${category}`} className="benchmark-grid" key={category}>{workloads.map(workload => <BenchmarkCard key={workload.id} workload={workload} left={getRecord(left, workload.id)} right={getRecord(right, workload.id)} leftDevice={left} rightDevice={right} onDetails={() => setDetailId(workload.id)} />)}{workloads.length === 0 && <div className="empty-state"><Search size={29} /><h3>Nenhum teste encontrado</h3><p>Tente outro termo ou explore novas fontes para esta categoria.</p><button className="outline-button" onClick={exploreSelectedTask}>Pesquisar fontes<ArrowUpRight size={15} /></button></div>}</div>
-              <aside className="context-column"><div className="context-card"><span className="context-icon"><FileCheck2 size={21} /></span><h3>Sobre estes resultados</h3><p>Uma medição só representa o hardware e as condições publicados na fonte.</p><div className="coverage-row"><span>Medições nesta seleção</span><strong>{matchingRecords.length}</strong></div><div className="coverage-row"><span>Testes com os dois Macs</span><strong>{pairedCount}</strong></div><button onClick={() => navigate("methodology")}>Como comparamos<ArrowUpRight size={14} /></button></div><button className="discover-card" onClick={() => navigate("research")}><span className="discover-icon"><Globe2 size={22} /></span><strong>Está faltando um teste?</strong><span>Encontre publicações sobre o seu jogo, modelo de IA ou aplicativo.</span><b>Explorar fontes<ArrowRight size={15} /></b></button></aside>
+            <div className="results-layout"><div id="benchmark-results" role="tabpanel" tabIndex={0} aria-labelledby={`tab-${category}`} className="results-primary" key={category}>
+              <div className="benchmark-grid">{displayedEntries.map(entry => <BenchmarkCard key={entry.workload.id} workload={entry.workload} left={entry.left} right={entry.right} leftDevice={left} rightDevice={right} sources={data.sources} onDetails={() => setDetailId(entry.workload.id)} />)}{workloads.length === 0 && <div className="empty-state"><Search size={29} /><h3>Nenhum teste encontrado</h3><p>Tente outro termo ou explore novas fontes para esta categoria.</p><button className="outline-button" onClick={exploreSelectedTask}>Pesquisar fontes<ArrowUpRight size={15} /></button></div>}{displayedEntries.length === 0 && unmeasuredEntries.length > 0 && <div className="empty-state"><Search size={25} /><h3>Ainda sem resultados para esta seleção.</h3><p>Os testes sem medição estão reunidos abaixo. Você também pode pesquisar novas fontes.</p><button className="outline-button" onClick={exploreSelectedTask}>Pesquisar fontes<ArrowUpRight size={15} /></button></div>}</div>
+              {unmeasuredEntries.length > 0 && <details className="unmeasured-tests"><summary><span>Testes ainda sem medição <small>{unmeasuredEntries.length}</small></span><ChevronRight size={16} /></summary><p>A base ainda não tem resultados destes testes para os Macs selecionados, considerando o filtro de referências.</p><div className="benchmark-grid">{unmeasuredEntries.map(entry => <BenchmarkCard key={entry.workload.id} workload={entry.workload} leftDevice={left} rightDevice={right} sources={data.sources} onDetails={() => setDetailId(entry.workload.id)} />)}</div></details>}
+            </div>
+              <aside className="context-column"><div className="context-card"><span className="context-icon"><FileCheck2 size={21} /></span><h3>Sobre estes resultados</h3><p>Os valores são medições publicadas. RAM, tela, SSD e condições permanecem identificados por teste.</p><div className="coverage-row"><span>Mesma RAM e tela</span><strong>{matchingHardwareCount}</strong></div><div className="coverage-row"><span>Referências de RAM/tela</span><strong>{hardwareReferenceCount}</strong></div><div className="coverage-row"><span>Testes com dois registros</span><strong>{pairedCount}</strong></div><button onClick={() => navigate("methodology")}>Como comparamos<ArrowUpRight size={14} /></button></div><button className="discover-card" onClick={() => navigate("research")}><span className="discover-icon"><Globe2 size={22} /></span><strong>Está faltando um teste?</strong><span>Encontre publicações sobre o seu jogo, modelo de IA ou aplicativo.</span><b>Explorar fontes<ArrowRight size={15} /></b></button></aside>
             </div>
           </section>
           <OffersPanel left={left} right={right} staticPreview={staticPreview} previewOffers={previewOffers} />
@@ -186,7 +204,7 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
       </main>
     </div>
     <DevicePicker devices={data.devices} measuredDeviceIds={measuredDeviceIds} selectedId={picker === "left" ? leftId : rightId} open={picker !== null} onClose={() => setPicker(null)} onSelect={id => chooseDevice(picker === "left" ? "left" : "right", id)} />
-    <Dialog open={!!selectedDetail && !!left && !!right} title={selectedDetail?.name ?? "Detalhes do teste"} onClose={() => setDetailId(null)} wide>{selectedDetail && left && right && <BenchmarkDetails workload={selectedDetail} left={left} right={right} data={data} />}</Dialog>
+    <Dialog open={!!selectedDetail && !!left && !!right} title={selectedDetail?.name ?? "Detalhes do teste"} onClose={() => setDetailId(null)} wide>{selectedDetail && left && right && <BenchmarkDetails workload={selectedDetail} left={left} right={right} data={data} includeRelated={includeRelated} />}</Dialog>
     <Dialog open={!!shareFallback} title="Compartilhar comparação" onClose={() => setShareFallback("")}><p className="dialog-description">Copie o link abaixo para abrir estes modelos e esta categoria.</p><label className="share-fallback-label">Link da comparação<input value={shareFallback} readOnly onFocus={event => event.target.select()} /></label></Dialog>
     <div className={`toast ${notice ? "toast-visible" : ""}`} role="status" aria-live="polite">{notice && <><Check size={16} />{notice}</>}</div>
   </div>;
@@ -205,21 +223,39 @@ function SpecsTable({ left, right }: { left: Device; right: Device }) {
   return <div className="specs-table-wrap"><table className="specs-table"><thead><tr><th scope="col">Especificação</th><th scope="col"><i className="dot-left" />{left.chip}<span>{left.family} · {left.memoryGb} GB</span></th><th scope="col"><i className="dot-right" />{right.chip}<span>{right.family} · {right.memoryGb} GB</span></th></tr></thead><tbody>{rows.map(row => <tr key={row.label}><th scope="row">{row.label}</th><td>{row.value(left)}</td><td>{row.value(right)}</td></tr>)}<tr className="source-specs-row"><th scope="row">Fonte oficial</th><td><a href={left.specUrl} target="_blank" rel="noopener noreferrer">Ficha técnica<ArrowUpRight size={13} /></a></td><td><a href={right.specUrl} target="_blank" rel="noopener noreferrer">Ficha técnica<ArrowUpRight size={13} /></a></td></tr></tbody></table></div>;
 }
 
-function BenchmarkDetails({ workload, left, right, data }: { workload: Workload; left: Device; right: Device; data: Dataset }) {
-  const leftRecord = recordForConfiguration(data, { deviceId: left.id, storageGb: left.storageGb }, workload.id);
-  const rightRecord = recordForConfiguration(data, { deviceId: right.id, storageGb: right.storageGb }, workload.id);
+function BenchmarkConfigurationContext({ record }: { record: Benchmark }) {
+  const hardware = record.hardwareReference, storage = record.storageReference;
+  if (!hardware && !storage) return null;
+  const rows: { label: string; tested: string; selected: string }[] = [];
+  if (hardware?.differences.includes("memory")) rows.push({ label: "RAM", tested: `${hardware.testedMemoryGb} GB`, selected: `${hardware.selectedMemoryGb} GB` });
+  if (hardware?.differences.includes("screen")) rows.push({ label: "Tela", tested: hardware.testedScreenInches === null ? "Não informada na fonte" : `${hardware.testedScreenInches.toLocaleString("pt-BR")}″`, selected: `${hardware.selectedScreenInches.toLocaleString("pt-BR")}″` });
+  if (storage) rows.push({ label: "SSD", tested: storage.testedStorageGb === null ? "Não informado na fonte" : storageLabel(storage.testedStorageGb), selected: storage.selectedStorageGb === null ? "Não informado" : storageLabel(storage.selectedStorageGb) });
+  return <div className="detail-storage-reference" role="note"><strong>Configuração testada e selecionada</strong><table className="detail-reference-table"><thead><tr><th scope="col">Hardware</th><th scope="col">Teste original</th><th scope="col">Sua seleção</th></tr></thead><tbody>{rows.map(row => <tr key={row.label}><th scope="row">{row.label}</th><td>{row.tested}</td><td>{row.selected}</td></tr>)}</tbody></table><p>O chip, a CPU e a GPU coincidem. O valor original é uma referência: diferenças de RAM, tela ou SSD não são convertidas em estimativas para a sua seleção.</p></div>;
+}
+
+function BenchmarkDetails({ workload, left, right, data, includeRelated }: { workload: Workload; left: Device; right: Device; data: Dataset; includeRelated: boolean }) {
+  const leftRecord = recordForConfiguration(data, { deviceId: left.id, storageGb: left.storageGb }, workload.id, { includeRelated });
+  const rightRecord = recordForConfiguration(data, { deviceId: right.id, storageGb: right.storageGb }, workload.id, { includeRelated });
   const comparison = compareBenchmarks(leftRecord, rightRecord, workload);
-  return <><p className="dialog-description">{workload.description}</p><div className={`detail-comparability ${comparison.status}`}><Info size={17} /><p>{comparison.explanation}</p></div><div className="detail-columns">{([{ device: left, record: leftRecord, side: "left" }, { device: right, record: rightRecord, side: "right" }] as { device: Device; record?: Benchmark; side: string }[]).map(({ device, record, side }) => {
+  const protocolDifference = benchmarkProtocolDifference(leftRecord, rightRecord, workload);
+  const explanation = protocolDifference === "resolution" ? "Resoluções diferentes entre os testes. Os valores publicados são referências e não geram um vencedor ou percentual de vantagem."
+    : protocolDifference === "resolution-unknown" ? "Resolução não informada em um dos testes. Sem vantagem calculada."
+    : protocolDifference === "conditions" ? "As condições dos testes diferem. Confira o protocolo publicado para cada resultado; não há vantagem calculada."
+    : comparison.explanation;
+  return <><p className="dialog-description">{workload.description}</p><div className={`detail-comparability ${protocolDifference ? "partial" : comparison.status}`}><Info size={17} /><p>{explanation}</p></div><div className="detail-columns">{([{ device: left, record: leftRecord, side: "left" }, { device: right, record: rightRecord, side: "right" }] as { device: Device; record?: Benchmark; side: string }[]).map(({ device, record, side }) => {
     const source = data.sources.find(s => s.id === record?.sourceId);
-    return <section className="detail-column" key={side}><div className="detail-device"><i className={`dot-${side}`} /><h3>{device.chip}</h3><span>{device.memoryGb} GB RAM</span></div>{record ? <><strong className="detail-value">{formatValue(record.value, workload.metric)}</strong><span className={`quality-label ${record.quality}`}>{record.quality === "documented" ? "Protocolo documentado" : "Condições parcialmente documentadas"}</span><p className="reported-hardware">{record.reportedHardware}</p>{record.storageReference && <div className="detail-storage-reference" role="note"><strong>Sobre o SSD deste teste</strong><dl><div><dt>SSD do teste</dt><dd>{record.storageReference.testedStorageGb === null ? "Não informado na fonte" : storageLabel(record.storageReference.testedStorageGb)}</dd></div><div><dt>SSD selecionado</dt><dd>{record.storageReference.selectedStorageGb === null ? "Não informado" : storageLabel(record.storageReference.selectedStorageGb)}</dd></div></dl><p>Mesmo modelo, ano, tamanho, chip, CPU, GPU e RAM. A medição original aparece como referência, sem estimar o efeito do SSD selecionado.</p></div>}<dl className="conditions-list">{Object.entries(record.conditions).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl>{record.missingFields.length > 0 && <div className="missing-fields"><strong>A fonte não informa</strong><p>{record.missingFields.join("; ")}.</p></div>}{record.notes && <p className="record-notes">{record.notes}</p>}{source && <div className="detail-source"><span>PUBLICAÇÃO ORIGINAL</span><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}<ExternalLink size={14} /></a><p>{source.publisher} · {formatDate(source.publishedAt)}</p><small>Consultada em {formatDate(source.accessedAt)}</small></div>}</> : <div className="detail-no-data"><Search size={23} /><h4>Ainda sem medição</h4><p>Não há um resultado publicado na base para esta configuração e este teste. Valores de outros Macs não foram usados como estimativa.</p></div>}</section>;
+    return <section className="detail-column" key={side}>
+      <div className="detail-device"><i className={`dot-${side}`} /><h3>{device.chip}</h3><span>{device.memoryGb} GB RAM selecionados</span></div>
+      {record ? <><strong className="detail-value">{formatValue(record.value, workload.metric)}</strong><BenchmarkReferenceBadges record={record} /><span className={`quality-label ${record.quality}`}>{record.quality === "documented" ? "Protocolo documentado" : "Condições parcialmente documentadas"}</span><p className="reported-hardware">{record.reportedHardware}</p><BenchmarkConfigurationContext record={record} /><dl className="conditions-list">{Object.entries(record.conditions).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl>{record.missingFields.length > 0 && <div className="missing-fields"><strong>A fonte não informa</strong><p>{record.missingFields.join("; ")}.</p></div>}{record.notes && <p className="record-notes">{record.notes}</p>}{source && <div className="detail-source"><span>PUBLICAÇÃO ORIGINAL</span><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}<ExternalLink size={14} /></a><p>{source.publisher} · {formatDate(source.publishedAt)}</p><small>Consultada em {formatDate(source.accessedAt)}</small></div>}</> : <div className="detail-no-data"><Search size={23} /><h4>Ainda sem medição</h4><p>Não há um resultado publicado na base para esta seleção e este teste, considerando o filtro de referências. Nenhum valor foi estimado.</p></div>}
+    </section>;
   })}</div></>;
 }
 
 function Methodology({ data }: { data: Dataset }) {
   const principles = [
-    { icon: Layers3, number: "01", title: "O hardware acompanha o teste.", text: "Modelo, ano, tamanho, chip, CPU, GPU e RAM precisam coincidir. O SSD exato tem preferência. FPS de jogos e tokens/s podem usar outro SSD como referência identificada, sem estimar seu efeito. Aplicativos, testes de disco e ofertas mantêm a correspondência de SSD." },
+    { icon: Layers3, number: "01", title: "O hardware acompanha o teste.", text: "Chip, CPU e GPU precisam coincidir. Medições com RAM, tela e SSD correspondentes têm preferência. A opção de configurações próximas permite referências de outra RAM ou tela em jogos e IA, sempre identificadas. Aplicativos, testes de disco e ofertas exigem a configuração correspondente." },
     { icon: SlidersHorizontal, number: "02", title: "A tarefa precisa ser a mesma.", text: "Jogos exigem resolução e preset. IA exige modelo, quantização e runtime. Renderizações exigem a mesma cena, versão e método de execução." },
     { icon: FileCheck2, number: "03", title: "A origem fica à vista.", text: "Cada medição aponta para a publicação original. Dados ausentes continuam ausentes. O comparador não inventa FPS, tokens por segundo ou tempos." },
   ];
-  return <section className="methodology"><div className="section-eyebrow"><ShieldCheck size={15} /> TRANSPARÊNCIA POR PADRÃO</div><h1>Como os dados entram<br /><span>na comparação.</span></h1><p className="methodology-intro">O MacVersus organiza testes publicados para ajudar você a comparar. Estes são os critérios que mantêm os resultados úteis.</p><div className="principle-grid">{principles.map(({ icon: Icon, number, title, text }) => <article key={number}><div><span className="principle-icon"><Icon size={23} /></span><span className="principle-number">{number}</span></div><h2>{title}</h2><p>{text}</p></article>)}</div><section className="reading-guide"><h2>Como interpretar os resultados</h2><div><span className="guide-status comparable">Comparável</span><p>O mesmo protocolo está documentado para as duas configurações. A diferença percentual se aplica somente a esse teste.</p></div><div><span className="guide-status partial">Contexto parcial</span><p>Há valores publicados, mas faltam condições equivalentes. Eles aparecem como referência, sem declarar vencedor ou vantagem.</p></div><div><span className="guide-status missing">Sem medição</span><p>A base ainda não possui esse resultado. Mais núcleos ou mais memória não são usados para fabricar uma estimativa.</p></div></section><div className="methodology-note"><Info size={21} /><p><strong>Publicações de terceiros, com limites claros.</strong> Os testes não foram executados pelo MacVersus. Resultados antigos continuam identificados pelas datas e versões de origem. Fontes de comunidade são identificadas como tal, e a busca na web descobre publicações sem converter seus resumos em benchmarks automaticamente.</p></div><section className="original-sources"><div className="results-heading"><div><div className="section-eyebrow">CONFIRA VOCÊ MESMO</div><h2>Publicações que sustentam a base.</h2></div><span className="sources-total">{data.sources.length} fontes</span></div><div className="original-source-grid">{data.sources.map(source => <a key={source.id} href={source.url} target="_blank" rel="noopener noreferrer"><div><span>{source.publisher}</span><ArrowUpRight size={17} /></div><h3>{source.title}</h3><p>Publicação: {formatDate(source.publishedAt)}</p><small>Consulta: {formatDate(source.accessedAt)}</small></a>)}</div></section></section>;
+  return <section className="methodology"><div className="section-eyebrow"><ShieldCheck size={15} /> TRANSPARÊNCIA POR PADRÃO</div><h1>Como os dados entram<br /><span>na comparação.</span></h1><p className="methodology-intro">O MacVersus organiza testes publicados para ajudar você a comparar. Estes são os critérios que mantêm os resultados úteis.</p><div className="principle-grid">{principles.map(({ icon: Icon, number, title, text }) => <article key={number}><div><span className="principle-icon"><Icon size={23} /></span><span className="principle-number">{number}</span></div><h2>{title}</h2><p>{text}</p></article>)}</div><section className="reading-guide"><h2>Como interpretar os resultados</h2><div><span className="guide-status comparable">Comparável</span><p>O mesmo protocolo está documentado para as duas configurações. A diferença percentual se aplica somente a esse teste.</p></div><div><span className="guide-status partial">Contexto parcial</span><p>RAM, tela, SSD ou condições podem diferir ou não estar documentados. Os valores originais aparecem como referência, sem declarar vencedor ou vantagem.</p></div><div><span className="guide-status missing">Sem medição</span><p>A base ainda não possui esse resultado. Mais núcleos ou mais memória não são usados para fabricar uma estimativa.</p></div></section><div className="methodology-note"><Info size={21} /><p><strong>Publicações de terceiros, com limites claros.</strong> Os testes não foram executados pelo MacVersus. Resultados antigos continuam identificados pelas datas e versões de origem. Fontes de comunidade são identificadas como tal, e a busca na web descobre publicações sem converter seus resumos em benchmarks automaticamente.</p></div><section className="original-sources"><div className="results-heading"><div><div className="section-eyebrow">CONFIRA VOCÊ MESMO</div><h2>Publicações que sustentam a base.</h2></div><span className="sources-total">{data.sources.length} fontes</span></div><div className="original-source-grid">{data.sources.map(source => <a key={source.id} href={source.url} target="_blank" rel="noopener noreferrer"><div><span>{source.publisher}</span><ArrowUpRight size={17} /></div><h3>{source.title}</h3><p>Publicação: {formatDate(source.publishedAt)}</p><small>Consulta: {formatDate(source.accessedAt)}</small></a>)}</div></section></section>;
 }

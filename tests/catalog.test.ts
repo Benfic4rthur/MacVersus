@@ -3,6 +3,7 @@ import test from "node:test";
 import { GET as getBenchmarks } from "../src/app/api/benchmarks/route";
 import { dataset } from "../src/data/catalog";
 import { compareBenchmarks } from "../src/lib/comparison";
+import { recordForConfiguration } from "../src/lib/configuration";
 
 test("catalog collections have nonempty unique identifiers", () => {
   for (const [name, items] of Object.entries({
@@ -74,18 +75,54 @@ test("source and specification URLs use HTTPS and Intel GPUs are not Apple GPU c
   }
 });
 
-test("API never transfers measurements to the unmeasured 32GB M1 configurations", async () => {
-  // These two catalog configurations have no measured source in this release.
-  // Add real source evidence before changing this expectation in a future release.
+test("API exposes newly sourced 32GB results without relabelling the 16GB or 64GB measurements", async () => {
   for (const id of ["mbp16-m1pro-32", "mbp16-m1max-32"]) {
     assert.ok(dataset.devices.some((device) => device.id === id));
     const response = await getBenchmarks(new Request(`https://example.com/api/benchmarks?deviceIds=${id}`));
     assert.equal(response.status, 200);
     const body = await response.json();
     assert.equal(body.devices.length, 1);
-    assert.deepEqual(body.benchmarks, []);
-    assert.deepEqual(body.sources, []);
+    assert.ok(body.benchmarks.length > 0);
+    assert.ok(body.sources.length > 0);
+    assert.ok(body.benchmarks.every((record: { deviceId: string; reportedHardware: string }) =>
+      record.deviceId === id && /RAM 32 GB/u.test(record.reportedHardware)));
+    assert.ok(!body.benchmarks.some((record: { sourceId: string }) =>
+      record.sourceId === "notebookcheck-m1pro" || record.sourceId === "notebookcheck-m1max"));
   }
+});
+
+test("the user's 32GB pair shows published FPS with the actual, different resolutions", () => {
+  const workload = dataset.workloads.find(w => w.id === "shadow-highest-published")!;
+  const left = recordForConfiguration(dataset, { deviceId: "mbp16-m1pro-32", storageGb: 1024 }, workload.id)!;
+  const right = recordForConfiguration(dataset, { deviceId: "mbp16-m1max-32", storageGb: 1024 }, workload.id)!;
+  assert.equal(left.value, 46);
+  assert.equal(right.value, 85);
+  assert.equal(left.conditions["Resolução"], "1920 × 1200");
+  assert.equal(right.conditions["Resolução"], "1920 × 1080");
+  assert.equal(left.sourceId, "verge-m1-2021");
+  assert.equal(right.sourceId, "reviewed-m1max-32");
+  assert.equal(left.hardwareReference, undefined);
+  assert.equal(right.hardwareReference, undefined);
+  const comparison = compareBenchmarks(left, right, workload);
+  assert.equal(comparison.winner, null);
+  assert.equal(comparison.percent, null, "Different resolutions cannot become a performance advantage");
+});
+
+test("LLM references retain measured RAM, while new M1 Max 32GB results remain distinct", () => {
+  const configuration = { deviceId: "mbp16-m1max-32", storageGb: 1024 };
+  assert.equal(recordForConfiguration(dataset, configuration, "llama2-q4-generation"), undefined);
+  const reference = recordForConfiguration(dataset, configuration, "llama2-q4-generation", { includeRelated: true })!;
+  assert.equal(reference.value, 61.19);
+  assert.equal(reference.deviceId, "mbp16-m1max-64");
+  assert.equal(reference.hardwareReference?.testedMemoryGb, 64);
+  assert.match(reference.reportedHardware, /RAM 64 GB/u);
+  const actual32 = recordForConfiguration(dataset, configuration, "qwen35-9b-llamacpp-4bit-generation-2026", { includeRelated: true })!;
+  assert.equal(actual32.value, 37.1);
+  assert.equal(actual32.deviceId, "mbp16-m1max-32");
+  assert.equal(actual32.hardwareReference?.testedMemoryGb, 32);
+  assert.equal(actual32.hardwareReference?.testedScreenInches, null);
+  assert.equal(actual32.testedStorageGb, null);
+  assert.match(actual32.reportedHardware, /RAM 32 GB/u);
 });
 
 test("API filters exact IDs and categories without fabricating missing entries", async () => {

@@ -4,22 +4,27 @@ Revisão: **27/10/2026**. Este registro descreve o que foi implementado e verifi
 
 ## Cobertura dos dados
 
-A base incluída no projeto contém **169 entradas de hardware, 17 protocolos, 23 medições e 6 registros de fontes**. Existem medições para seis configurações específicas. As demais entradas oferecem ficha técnica e seleção de hardware, sem resultados estimados.
+A base incluída no projeto contém **169 entradas de hardware, 53 tarefas/protocolos, 90 medições e 20 registros de fontes**. Existem medições para 12 configurações específicas, com tela ou SSD explicitamente desconhecidos em parte dos relatos. As demais entradas oferecem ficha técnica e seleção de hardware, sem resultados estimados.
 
 | Categoria | Protocolos cadastrados | Medições publicadas | Configurações com medição |
 | --- | ---: | ---: | ---: |
-| Jogos | 5 | 11 | 4 |
-| IA local | 3 | 6 | 2 |
-| Criação e aplicativos | 9 | 6 | 4 |
+| Jogos | 11 | 21 | 7 |
+| IA local | 31 | 48 | 7 |
+| Criação e aplicativos | 11 | 21 | 8 |
 
 As contagens vêm de [catalog.ts](../src/data/catalog.ts), [catalog-devices.ts](../src/data/catalog-devices.ts) e [intel-benchmarks.ts](../src/data/intel-benchmarks.ts). Uma mesma configuração pode aparecer em mais de uma categoria. Protocolos cadastrados sem medição são alvos de pesquisa, não testes executados.
 
-As 23 medições iniciais possuem condições parcialmente documentadas. A interface mostra os valores publicados e suas limitações, sem declarar vencedor ou vantagem percentual. O radar representa capacidades de hardware, com uma escala por eixo; não é uma previsão de FPS, tokens/s ou tempo de exportação. Jogos em Boot Camp preservam esse ambiente, separado dos registros em macOS.
+As medições possuem condições parcialmente documentadas. A interface mostra os valores publicados e suas limitações, sem declarar vencedor ou vantagem percentual. O radar representa capacidades de hardware, com uma escala por eixo; não é uma previsão de FPS, tokens/s ou tempo de exportação. Jogos em Boot Camp preservam esse ambiente, separado dos registros em macOS.
 
 Chip, CPU, GPU, RAM, família, ano e tela precisam corresponder à máquina testada. Para FPS e tokens/s, um SSD diferente ou não informado não esconde a medição: o registro aparece como referência, com a capacidade testada identificada, e um teste com SSD correspondente tem prioridade. Essa referência não recebe vencedor nem vantagem percentual. Testes de disco e dos demais aplicativos continuam exigindo correspondência de SSD. Um SSD desconhecido não passa a ser tratado como uma capacidade conhecida. Modelos novos no catálogo não recebem automaticamente resultados de chips anteriores. As fontes e datas originais estão em [sources.md](sources.md).
 
+A opção de incluir configurações próximas permite consultar FPS/tokens/s do mesmo chip, CPU, GPU, família e ano, com outra RAM ou tela, ou tela não publicada. A diferença aparece junto ao valor e no CSV. O resultado continua pertencendo ao hardware original. Essa opção é inicial, pode ser desativada e acompanha a URL compartilhada.
+
 ## Verificações realizadas
 
+- A ampliação passou nos oito arquivos da suíte, no TypeScript e nos builds Next.js e estático. Regressões verificam o par de 32 GB do usuário, resoluções diferentes, RAM original das referências, campos desconhecidos, feed e CSV.
+- Na prévia, o par M1 Pro GPU 16/32 GB e M1 Max GPU 32/32 GB exibiu 46 e 85 FPS em Shadow com 1200p/1080p visíveis. IA local exibiu 36,41 e 61,19 tok/s em Llama 2, com o segundo resultado identificado como teste em 64 GB, e 57,1 tok/s no M1 Max de 32 GB em Qwen3.5-9B/MLX. O filtro de referências, seleção de tarefa, modal e abertura inicial vazia foram conferidos.
+- O conteúdo do CSV e a distinção de hardware testado/selecionado passaram nos testes automatizados. O download na prévia HTTP retornou falha no navegador de teste; o arquivo baixado não foi validado nessa tentativa.
 - O TypeScript foi validado sem erros nas verificações registradas desta revisão.
 - O build de produção do Next.js 16.4.3 foi concluído, incluindo a página e as rotas de benchmarks, ofertas e pesquisa.
 - A prévia estática foi gerada com esbuild. O HTML referencia os bundles de JavaScript e CSS com hash e os arquivos locais de imagem e marca.

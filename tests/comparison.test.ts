@@ -56,6 +56,22 @@ test("SSD references show published values without a winner, percentage or appar
   }
 });
 
+test("RAM or unknown-screen references cannot produce a winner even with documented matching protocols", () => {
+  for (const hardwareReference of [
+    { testedMemoryGb: 64, selectedMemoryGb: 32, testedScreenInches: 16.2, selectedScreenInches: 16.2, differences: ["memory" as const] },
+    { testedMemoryGb: 32, selectedMemoryGb: 32, testedScreenInches: null, selectedScreenInches: 16.2, differences: ["screen" as const] },
+  ]) {
+    const reference = { ...sample, hardwareReference, value: 200 };
+    for (const [left, right] of [[reference, sample], [sample, reference], [reference, reference]]) {
+      const result = compareBenchmarks(left, right, workload);
+      assert.equal(result.status, "partial");
+      assert.equal(result.winner, null);
+      assert.equal(result.percent, null);
+      assert.match(result.explanation, /RAM ou tela/u);
+    }
+  }
+});
+
 test("CSV includes provenance, escapes formulas and retains missing data", () => {
   const dataset: Dataset = {
     updatedAt: "2026-10-27", workloads: [workload], benchmarks: [{ ...sample, notes: '=HYPERLINK("https://example.com")' }],
@@ -67,6 +83,46 @@ test("CSV includes provenance, escapes formulas and retains missing data", () =>
   assert.ok(csv.includes("Sem dados"));
   assert.ok(csv.includes("'=HYPERLINK"));
   assert.ok(csv.startsWith("\uFEFF"));
+});
+
+test("CSV keeps selected and tested RAM/screens separate and labels reference versus exact", () => {
+  const measurement: Benchmark = {
+    ...sample, reportedHardware: "M1 Pro, RAM 64 GB; tela e SSD não informados",
+    testedStorageGb: null, testedScreenInches: null,
+    storageReference: { testedStorageGb: null, selectedStorageGb: 1024 },
+    hardwareReference: {
+      testedMemoryGb: 64, selectedMemoryGb: 32, testedScreenInches: null,
+      selectedScreenInches: 16.2, differences: ["memory", "screen"],
+    },
+  };
+  const fixture: Dataset = {
+    updatedAt: "2026-10-27", workloads: [workload], benchmarks: [measurement], sources: [],
+    devices: [{ id: "a", name: "Mac", family: "MacBook Pro", year: 2021, chip: "M1 Pro", cpuCores: 10,
+      gpuCores: 16, memoryGb: 32, storageGb: 1024, bandwidthGbps: 200, screenInches: 16.2, specUrl: "https://support.apple.com/" }],
+  };
+  const cells = (line: string) => [...line.matchAll(/"((?:[^"]|"")*)"/gu)].map(match => match[1].replaceAll('""', '"'));
+  const read = (data: Dataset) => {
+    const [header, row] = buildComparisonCsv(data, "a", "missing", "apps").slice(1).split("\r\n").map(cells);
+    assert.equal(row.length, header.length);
+    return Object.fromEntries(header.map((key, index) => [key, row[index]]));
+  };
+  const reference = read(fixture);
+  assert.equal(reference["RAM selecionada (GB)"], "32");
+  assert.equal(reference["RAM testada (GB)"], "64");
+  assert.equal(reference["Tela testada (pol.)"], "Não informado");
+  assert.equal(reference["Tela selecionada (pol.)"], "16.2");
+  assert.equal(reference["SSD testado (GB)"], "Não informado");
+  assert.equal(reference["Tipo de resultado"], "reference");
+  assert.equal(reference["Hardware reportado"], measurement.reportedHardware);
+  assert.match(reference["Hardware selecionado"], /RAM 32 GB/u);
+  const exact = read({ ...fixture, benchmarks: [sample] });
+  assert.equal(exact["Tipo de resultado"], "exact");
+  assert.equal(exact["RAM testada (GB)"], "32");
+  assert.equal(exact["SSD testado (GB)"], "1024");
+  const persistedUnknown = read({ ...fixture, benchmarks: [{ ...sample, testedStorageGb: null, testedScreenInches: null }] });
+  assert.equal(persistedUnknown["SSD testado (GB)"], "Não informado");
+  assert.equal(persistedUnknown["Tela testada (pol.)"], "Não informado");
+  assert.equal(persistedUnknown["Tipo de resultado"], "reference");
 });
 
 test("CSV separates selected and tested SSD and preserves the real reported hardware", () => {

@@ -1,6 +1,7 @@
 import type { Benchmark, Dataset, Device } from "./types";
 
 export interface Configuration { deviceId: string; storageGb: number | null }
+export interface ConfigurationRecordOptions { includeRelated?: boolean }
 
 /** Storage choices from each machine's linked Apple specification sheet. */
 export function getStorageOptions(device: Device): number[] {
@@ -40,32 +41,53 @@ export function configurationDevice(data: Dataset, configuration: Configuration)
   return device ? { ...device, storageGb: configuration.storageGb } : undefined;
 }
 
-export function recordForConfiguration(data: Dataset, configuration: Configuration, workloadId: string): Benchmark | undefined {
+export function recordForConfiguration(
+  data: Dataset, configuration: Configuration, workloadId: string, options: ConfigurationRecordOptions = {},
+): Benchmark | undefined {
   const original = data.devices.find(item => item.id === configuration.deviceId);
   if (!original) return undefined;
+  const workload = data.workloads.find(item => item.id === workloadId);
+  const permitsReference = Boolean(workload && ((workload.category === "games" && workload.metric === "fps")
+    || (workload.category === "llms" && workload.metric === "tokens/s")));
   const matchingDevices = new Map(data.devices.filter(candidate => candidate.family === original.family
-    && candidate.year === original.year && candidate.screenInches === original.screenInches
+    && candidate.year === original.year
     && (candidate.architecture ?? "apple-silicon") === (original.architecture ?? "apple-silicon")
     && candidate.chip === original.chip && candidate.cpuCores === original.cpuCores
     && candidate.gpuCores === original.gpuCores && candidate.gpuName === original.gpuName
-    && candidate.gpuMemoryGb === original.gpuMemoryGb && candidate.memoryGb === original.memoryGb)
+    && candidate.gpuMemoryGb === original.gpuMemoryGb)
     .map(candidate => [candidate.id, candidate]));
-  const records = data.benchmarks.filter(item => matchingDevices.has(item.deviceId) && item.workloadId === workloadId);
-  const exact = records.find(item => matchingDevices.get(item.deviceId)!.storageGb === configuration.storageGb);
-  if (exact) return exact;
+  const candidates = data.benchmarks.flatMap(record => {
+    const testedDevice = matchingDevices.get(record.deviceId);
+    if (!testedDevice || record.workloadId !== workloadId) return [];
+    const testedStorageGb = record.testedStorageGb === undefined ? testedDevice.storageGb : record.testedStorageGb;
+    const testedScreenInches = record.testedScreenInches === undefined ? testedDevice.screenInches : record.testedScreenInches;
+    const sameMemory = testedDevice.memoryGb === original.memoryGb;
+    const sameScreen = testedScreenInches === original.screenInches;
+    const sameStorage = testedStorageGb === configuration.storageGb;
+    if ((!sameMemory || !sameScreen) && !(permitsReference && options.includeRelated)) return [];
+    if (!sameStorage && !permitsReference) return [];
+    return [{ record, testedDevice, testedStorageGb, testedScreenInches, sameMemory, sameScreen, sameStorage }];
+  });
+  // Exact RAM comes first, then the measured screen, SSD and selected catalog ID.
+  candidates.sort((a, b) => Number(b.sameMemory) - Number(a.sameMemory)
+    || Number(b.sameScreen) - Number(a.sameScreen) || Number(b.sameStorage) - Number(a.sameStorage)
+    || Number(b.record.deviceId === original.id) - Number(a.record.deviceId === original.id));
+  const best = candidates[0];
+  if (!best) return undefined;
+  if (best.sameMemory && best.sameScreen && best.sameStorage) return best.record;
 
-  // Throughput may be shown as a reference for identical compute hardware. This
-  // does not claim that a different or unknown SSD was tested, or predict its result.
-  const workload = data.workloads.find(item => item.id === workloadId);
-  const permitsReference = workload && ((workload.category === "games" && workload.metric === "fps")
-    || (workload.category === "llms" && workload.metric === "tokens/s"));
-  if (!permitsReference) return undefined;
-  const reference = records.find(item => item.deviceId === original.id) ?? records[0];
-  if (!reference) return undefined;
-  return { ...reference, storageReference: {
-    testedStorageGb: matchingDevices.get(reference.deviceId)!.storageGb,
-    selectedStorageGb: configuration.storageGb,
-  } };
+  const reference: Benchmark = { ...best.record };
+  if (!best.sameMemory || !best.sameScreen) {
+    reference.hardwareReference = {
+      testedMemoryGb: best.testedDevice.memoryGb, selectedMemoryGb: original.memoryGb,
+      testedScreenInches: best.testedScreenInches, selectedScreenInches: original.screenInches,
+      differences: [...(best.sameMemory ? [] : ["memory" as const]), ...(best.sameScreen ? [] : ["screen" as const])],
+    };
+  }
+  if (!best.sameStorage) reference.storageReference = {
+    testedStorageGb: best.testedStorageGb, selectedStorageGb: configuration.storageGb,
+  };
+  return reference;
 }
 
 export function parseStorageSelection(value: string | null, device: Device): number | null {
@@ -75,7 +97,7 @@ export function parseStorageSelection(value: string | null, device: Device): num
 }
 
 /** Export selected records with any SSD reference metadata, including same-model pairs. */
-export function datasetForSelections(data: Dataset, selections: Configuration[]): Dataset {
+export function datasetForSelections(data: Dataset, selections: Configuration[], options: ConfigurationRecordOptions = {}): Dataset {
   const devices: Device[] = [];
   const benchmarks: Benchmark[] = [];
   for (const [index, selection] of selections.entries()) {
@@ -84,7 +106,7 @@ export function datasetForSelections(data: Dataset, selections: Configuration[])
     const id = `${device.id}-selection-${index}`;
     devices.push({ ...device, id });
     for (const workload of data.workloads) {
-      const record = recordForConfiguration(data, selection, workload.id);
+      const record = recordForConfiguration(data, selection, workload.id, options);
       if (record) benchmarks.push({ ...record, id: `${record.id}-selection-${index}`, deviceId: id });
     }
   }

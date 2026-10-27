@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { dataset } from "../src/data/catalog";
 import { buildCapacityProfile, datasetForSelections, getDefaultStorage, getStorageOptions, parseStorageSelection, recordForConfiguration } from "../src/lib/configuration";
-import type { Device, Workload } from "../src/lib/types";
+import type { Benchmark, Device, Workload } from "../src/lib/types";
 
 test("FPS remains a labelled reference when only the selected SSD changes", () => {
   const deviceId = "mbp16-m1max-64";
@@ -107,14 +107,129 @@ test("rendering, exports and storage tests require the selected SSD, even for ap
 test("selection exports retain tested SSD and reported hardware separately from the selected capacity", () => {
   const deviceId = "mbp16-m1max-64";
   const exported = datasetForSelections(dataset, [{ deviceId, storageGb: 1024 }, { deviceId, storageGb: 2048 }]);
-  const references = exported.benchmarks.filter(b => b.deviceId === exported.devices[0].id);
+  const references = exported.benchmarks.filter(b => b.deviceId === exported.devices[0].id && b.workloadId === "shadow-1080-high");
   assert.ok(references.length > 0);
   assert.ok(references.every(b => b.storageReference?.testedStorageGb === 2048));
   assert.ok(references.every(b => b.storageReference?.selectedStorageGb === 1024));
   assert.ok(references.every(b => b.reportedHardware.includes("SSD 2 TB")));
   assert.equal(exported.devices[0].storageGb, 1024);
   assert.equal(exported.devices[1].storageGb, 2048);
-  assert.ok(exported.benchmarks.filter(b => b.deviceId === exported.devices[1].id).every(b => !b.storageReference));
+  assert.ok(exported.benchmarks.filter(b => b.deviceId === exported.devices[1].id && b.workloadId === "shadow-1080-high").every(b => !b.storageReference));
+});
+
+test("source SSD overrides take priority and explicit unknown never inherits the catalog SSD", () => {
+  const device = dataset.devices.find(d => d.id === "mbp16-m1max-64")!;
+  const source = dataset.benchmarks.find(b => b.deviceId === device.id && b.workloadId === "shadow-1080-high")!;
+  const selection = { deviceId: device.id, storageGb: device.storageGb };
+  const unknown = { ...source, testedStorageGb: null };
+  const unknownData = { ...dataset, benchmarks: [unknown] };
+  const reference = recordForConfiguration(unknownData, selection, source.workloadId)!;
+  assert.deepEqual(reference.storageReference, { testedStorageGb: null, selectedStorageGb: 2048 });
+  assert.equal(reference.deviceId, source.deviceId);
+  assert.equal(reference.value, source.value);
+  assert.equal(unknown.storageReference, undefined);
+  const overridden = { ...source, testedStorageGb: 1024 };
+  const overriddenData = { ...dataset, benchmarks: [overridden] };
+  assert.equal(recordForConfiguration(overriddenData, { ...selection, storageGb: 1024 }, source.workloadId), overridden);
+  assert.deepEqual(recordForConfiguration(overriddenData, selection, source.workloadId)?.storageReference,
+    { testedStorageGb: 1024, selectedStorageGb: 2048 });
+  assert.equal(device.storageGb, 2048);
+});
+
+test("unknown tested screen requires related mode and is never filled from the catalog", () => {
+  const device = dataset.devices.find(d => d.id === "mbp16-m1max-64")!;
+  const source = dataset.benchmarks.find(b => b.deviceId === device.id && b.workloadId === "shadow-1080-high")!;
+  const record = { ...source, testedScreenInches: null, testedStorageGb: null };
+  const fixture = { ...dataset, benchmarks: [record] };
+  const selection = { deviceId: device.id, storageGb: 2048 };
+  assert.equal(recordForConfiguration(fixture, selection, source.workloadId), undefined);
+  const reference = recordForConfiguration(fixture, selection, source.workloadId, { includeRelated: true })!;
+  assert.deepEqual(reference.hardwareReference, {
+    testedMemoryGb: 64, selectedMemoryGb: 64, testedScreenInches: null, selectedScreenInches: 16.2, differences: ["screen"],
+  });
+  assert.deepEqual(reference.storageReference, { testedStorageGb: null, selectedStorageGb: 2048 });
+  assert.equal(reference.reportedHardware, source.reportedHardware);
+  assert.equal(record.hardwareReference, undefined);
+  const selected14 = { ...device, id: "fixture-selected-14", screenInches: 14.2 };
+  const screenOverride = { ...source, testedScreenInches: 14.2 };
+  const actual14 = { ...dataset, devices: [device, selected14], benchmarks: [screenOverride] };
+  assert.equal(recordForConfiguration(actual14, { deviceId: selected14.id, storageGb: 2048 }, source.workloadId), screenOverride);
+});
+
+test("related mode labels 64 GB results for 32 GB selections without changing source identity or value", () => {
+  const tested = dataset.devices.find(d => d.id === "mbp16-m1max-64")!;
+  const selected = { ...tested, id: "fixture-32gb", memoryGb: 32, storageGb: 1024 };
+  const source = dataset.benchmarks.find(b => b.deviceId === tested.id && b.workloadId === "shadow-1080-high")!;
+  const fixture = { ...dataset, devices: [tested, selected], benchmarks: [source] };
+  const selection = { deviceId: selected.id, storageGb: 1024 };
+  assert.equal(recordForConfiguration(fixture, selection, source.workloadId), undefined);
+  const reference = recordForConfiguration(fixture, selection, source.workloadId, { includeRelated: true })!;
+  assert.deepEqual(reference.hardwareReference, {
+    testedMemoryGb: 64, selectedMemoryGb: 32, testedScreenInches: 16.2, selectedScreenInches: 16.2, differences: ["memory"],
+  });
+  assert.equal(reference.deviceId, tested.id);
+  assert.equal(reference.id, source.id);
+  assert.equal(reference.value, source.value);
+  assert.equal(reference.sourceId, source.sourceId);
+  assert.equal(reference.reportedHardware, source.reportedHardware);
+  assert.equal(source.hardwareReference, undefined);
+  const strictExport = datasetForSelections(fixture, [selection]);
+  assert.equal(strictExport.benchmarks.length, 0);
+  const relatedExport = datasetForSelections(fixture, [selection], { includeRelated: true });
+  assert.equal(relatedExport.benchmarks[0].hardwareReference?.testedMemoryGb, 64);
+  assert.equal(relatedExport.devices[0].memoryGb, 32);
+});
+
+test("related candidates prefer equal RAM, then measured screen, SSD and selected device ID", () => {
+  const original = dataset.devices.find(d => d.id === "mbp16-m1max-64")!;
+  const selected = { ...original, id: "fixture-selected", memoryGb: 32, storageGb: 1024 };
+  const alias = { ...selected, id: "fixture-alias" };
+  const source = dataset.benchmarks.find(b => b.deviceId === original.id && b.workloadId === "shadow-1080-high")!;
+  const candidate = (id: string, override: Partial<Benchmark>): Benchmark => ({ ...source, id, deviceId: alias.id, ...override });
+  const records: Benchmark[] = [
+    candidate("other-memory", { deviceId: original.id, testedStorageGb: 1024 }),
+    candidate("same-memory-unknown-screen", { testedScreenInches: null, testedStorageGb: 2048 }),
+    candidate("same-screen-other-ssd", { testedStorageGb: 2048 }),
+    candidate("same-ssd", {}),
+    candidate("selected-id", { deviceId: selected.id }),
+  ];
+  const fixture = { ...dataset, devices: [original, selected, alias], benchmarks: records };
+  for (let length = 2; length <= records.length; length++) {
+    const result = recordForConfiguration({ ...fixture, benchmarks: records.slice(0, length) },
+      { deviceId: selected.id, storageGb: 1024 }, source.workloadId, { includeRelated: true })!;
+    assert.equal(result.id, records[length - 1].id);
+  }
+});
+
+test("related mode never crosses chip, CPU, GPU, family, year, architecture or Intel VRAM", () => {
+  const original = dataset.devices.find(d => d.id === "mbp16-m1max-64")!;
+  const source = dataset.benchmarks.find(b => b.deviceId === original.id && b.workloadId === "shadow-1080-high")!;
+  const differences: Partial<Device>[] = [{ chip: "M2 Max" }, { cpuCores: 8 }, { gpuCores: 24 },
+    { family: "MacBook Air" }, { year: 2023 }, { architecture: "intel" }, { gpuName: "Different GPU" }, { gpuMemoryGb: 8 }];
+  for (const difference of differences) {
+    const other = { ...original, ...difference, id: "fixture-other", memoryGb: 32, screenInches: 14.2 };
+    const fixture = { ...dataset, devices: [original, other], benchmarks: [{ ...source, deviceId: other.id }] };
+    assert.equal(recordForConfiguration(fixture, { deviceId: original.id, storageGb: 1024 }, source.workloadId, { includeRelated: true }), undefined);
+  }
+  const intel = dataset.devices.find(d => d.architecture === "intel" && d.gpuMemoryGb)!;
+  const otherIntel = { ...intel, id: "fixture-intel-different-vram", gpuMemoryGb: intel.gpuMemoryGb! + 4 };
+  assert.equal(recordForConfiguration({ ...dataset, devices: [intel, otherIntel], benchmarks: [{ ...source, deviceId: otherIntel.id }] },
+    { deviceId: intel.id, storageGb: intel.storageGb }, source.workloadId, { includeRelated: true }), undefined);
+});
+
+test("apps never approximate RAM, screen or SSD, including explicit unknown provenance", () => {
+  const device = dataset.devices.find(d => d.id === "mbp16-m1max-64")!;
+  const selected = { ...device, id: "fixture-app-selected", memoryGb: 32, storageGb: 2048 };
+  const source = dataset.benchmarks.find(b => b.deviceId === device.id && b.workloadId === "blender-bmw-cpu")!;
+  const fixture = { ...dataset, devices: [device, selected], benchmarks: [source] };
+  assert.equal(recordForConfiguration(fixture, { deviceId: selected.id, storageGb: 2048 }, source.workloadId, { includeRelated: true }), undefined);
+  for (const provenance of [{ testedStorageGb: null }, { testedStorageGb: 1024 }, { testedScreenInches: null }, { testedScreenInches: 14.2 }]) {
+    assert.equal(recordForConfiguration({ ...fixture, benchmarks: [{ ...source, ...provenance }] },
+      { deviceId: device.id, storageGb: 2048 }, source.workloadId, { includeRelated: true }), undefined);
+  }
+  const exact = { ...source, testedStorageGb: 1024 };
+  assert.equal(recordForConfiguration({ ...fixture, benchmarks: [exact] },
+    { deviceId: device.id, storageGb: 1024 }, source.workloadId, { includeRelated: true }), exact);
 });
 
 test("valid shared SSD selections are preserved; absent or invalid selections use the smallest option", () => {
