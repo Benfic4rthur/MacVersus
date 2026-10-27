@@ -115,11 +115,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hero h1 > span { color: #626c79; font-weight: 450; }
 .hero h1 br, .hero .desktop-break { display: none; }
 .hero p { color: #6b7580; font-size: 12px; line-height: 1.75; max-width: 640px; }
-.hero-data { display: flex; align-items: flex-start; gap: 26px; padding: 0 0 3px; min-width: 0; }
+.hero-data { display: flex; flex: 0 0 auto; align-items: stretch; gap: 24px; padding: 0 0 3px; min-width: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .hero-data-icon, .hero-data-divider { display: none; }
-.hero-data > div:not(.hero-data-divider) { display: flex; flex-direction: column; }
-.hero-data strong { font-size: 23px; font-weight: 650; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
-.hero-data span:not(.hero-data-icon) { color: #79828e; font-size: 10px; margin-top: 4px; max-width: 120px; }
+.hero-data > div:not(.hero-data-divider) { display: flex; flex-direction: column; gap: 6px; }
+.hero-data > div:last-child { border-left: 1px solid #d8dfe7; padding-left: 24px; }
+.hero-data strong { font-size: 25px; line-height: 1; font-weight: 600; letter-spacing: -.6px; font-variant-numeric: tabular-nums; }
+.hero-data span:not(.hero-data-icon) { color: #79828e; font-size: 10px; line-height: 1.5; margin: 0; max-width: none; white-space: nowrap; }
 
 /* Hardware takes one compact row per Mac, with an actual product photo. */
 .machine-comparison { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-bottom: 13px; }
@@ -134,6 +135,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .device-card:hover { transform: none; border-color: #c8d0db; box-shadow: 0 3px 12px #233b5107; }
 .device-left:hover { border-top-color: var(--purple); }
 .device-right:hover { border-top-color: var(--amber); }
+.device-card-empty { display: flex; flex-direction: column; min-height: 325px; }
+.empty-device-pick { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 28px 12px; background: transparent; text-align: center; }
+.empty-device-pick > svg { color: #9daab9; margin-bottom: 6px; }
+.empty-device-pick strong { color: #445267; font-size: clamp(14px, 1.5vw, 19px); font-weight: 550; letter-spacing: -.35px; }
+.empty-device-pick > span:not(.empty-device-action) { color: #7c8795; font-size: 11px; }
+.empty-device-action { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px; padding: 8px 12px; border: 1px solid #d3dfef; border-radius: 7px; background: #f5f8fd; color: #2958b4; font-size: 12px; font-weight: 550; }
+.device-right .empty-device-action { color: #896019; border-color: #e7ddca; background: #fcfaf5; }
+.empty-device-pick:hover { background: #f7f9fc80; }
+.empty-device-pick:focus-visible { outline-offset: -5px; border-radius: 8px; }
+.selection-hint { margin: 24px 0 38px; padding: 23px 16px; border-top: 1px solid var(--line); color: #718093; font-size: 13px; text-align: center; }
+.swap-button:disabled, .share-button:disabled { cursor: default; opacity: .4; }
 .device-card-top { padding: 14px 20px 0; gap: 12px; }
 .device-marker { color: #68727f; font-size: 9px; letter-spacing: 1.1px; }
 .device-marker i, .dot-left, .dot-right { width: 6px; height: 6px; border-radius: 2px; }
@@ -373,7 +385,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .brand { font-size: 19px; }
   .content { padding-left: 30px; padding-right: 30px; }
   .hero h1 { font-size: 32px; }
-  .hero-data { gap: 19px; }
+  .hero-data { gap: 20px; }
+  .hero-data > div:last-child { padding-left: 20px; }
   .device-card-top { padding: 13px 16px 0; }
   .device-card-body { padding: 12px 17px; gap: 10px; min-height: 176px; }
   .device-title h2 { font-size: 21px; }
@@ -416,7 +429,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .hero { gap: 20px; align-items: flex-end; }
   .hero h1 { font-size: 31px; }
   .hero-data strong { font-size: 21px; }
-  .hero-data span:not(.hero-data-icon) { font-size: 9px; max-width: 100px; }
+  .hero-data span:not(.hero-data-icon) { font-size: 10px; }
   .device-card-body { flex-direction: column; text-align: center; gap: 9px; padding: 13px 18px 10px; }
   .device-title { width: 100%; }
   .device-year { justify-content: center; }
@@ -443,10 +456,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (max-width: 700px) {
   .hero { flex-direction: column; align-items: flex-start; gap: 17px; padding-bottom: 18px; }
   .hero h1 { font-size: 32px; margin-top: 9px; }
-  .hero-data { display: flex; flex-direction: row; gap: 30px; padding: 0; }
-  .hero-data > div:not(.hero-data-divider) { flex-direction: row; align-items: baseline; gap: 7px; }
-  .hero-data strong { font-size: 18px; }
-  .hero-data span:not(.hero-data-icon) { max-width: none; font-size: 9px; margin-top: 0; }
+  .hero-data { display: flex; flex-direction: row; gap: 20px; padding: 0; }
+  .hero-data > div:not(.hero-data-divider) { flex-direction: column; align-items: flex-start; gap: 5px; }
+  .hero-data strong { font-size: 21px; }
+  .hero-data span:not(.hero-data-icon) { font-size: 10px; }
   .machine-comparison { gap: 16px; }
   .device-card-top { padding: 12px 12px 0; flex-wrap: wrap; gap: 8px; }
   .device-marker { font-size: 8px; letter-spacing: .6px; }
@@ -503,8 +516,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .hero { margin-bottom: 17px; }
   .hero h1 { font-size: 30px; letter-spacing: -1px; line-height: 1.15; }
   .hero p { font-size: 11px; }
-  .hero-data { gap: 17px; flex-wrap: wrap; }
-  .hero-data span:not(.hero-data-icon) { font-size: 9px; }
+  .hero-data { gap: 16px; flex-wrap: nowrap; }
+  .hero-data > div:last-child { padding-left: 16px; }
   .machine-comparison { gap: 12px; }
   .device-card { border-radius: 8px; }
   .device-card-top { padding: 11px 10px 0; gap: 7px; }

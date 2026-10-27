@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeftRight, ArrowRight, ArrowUpRight, BarChart3, BookOpen, BrainCircuit, Check, CheckCheck, ChevronRight, Clapperboard, Clock3, Download, ExternalLink, FileCheck2, Gamepad2, GitBranch, Globe2, Info, Layers3, Menu, RefreshCw, Search, Share2, ShieldCheck, SlidersHorizontal, X } from "lucide-react";
 import type { Benchmark, Category, Dataset, Device, Workload } from "@/lib/types";
 import { buildComparisonCsv, compareBenchmarks, formatValue } from "@/lib/comparison";
-import { DeviceCard, DevicePicker, gpuLabel, isIntel } from "./DevicePicker";
+import { DeviceCard, DevicePicker, EmptyDeviceCard, gpuLabel, isIntel } from "./DevicePicker";
 import { BenchmarkCard } from "./BenchmarkCard";
 import { Dialog } from "./Dialog";
 import { ResearchPanel } from "./ResearchPanel";
@@ -24,10 +24,10 @@ const formatDate = (value: string | null) => value ? new Date(`${value.slice(0, 
 
 export function MacVersus({ data: initialData, staticPreview = false, previewOffers }: { data: Dataset; staticPreview?: boolean; previewOffers?: VerifiedOffer[] }) {
   const [data, setData] = useState(initialData);
-  const [leftId, setLeftId] = useState(data.devices.find(d => d.id === "mbp16-m1pro-16")?.id ?? data.devices[0]?.id ?? "");
-  const [rightId, setRightId] = useState(data.devices.find(d => d.id === "mbp16-m1max-64")?.id ?? data.devices[1]?.id ?? "");
-  const [leftStorage, setLeftStorage] = useState<number | null>(data.devices.find(d => d.id === "mbp16-m1pro-16")?.storageGb ?? null);
-  const [rightStorage, setRightStorage] = useState<number | null>(data.devices.find(d => d.id === "mbp16-m1max-64")?.storageGb ?? null);
+  const [leftId, setLeftId] = useState("");
+  const [rightId, setRightId] = useState("");
+  const [leftStorage, setLeftStorage] = useState<number | null>(null);
+  const [rightStorage, setRightStorage] = useState<number | null>(null);
   const [category, setCategory] = useState<Category>("games");
   const [view, setView] = useState<View>("compare");
   const [picker, setPicker] = useState<"left" | "right" | null>(null);
@@ -56,9 +56,12 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
   useEffect(() => {
     if (!ready) return;
     const url = new URL(window.location.href);
-    url.searchParams.set("left", leftId); url.searchParams.set("right", rightId); url.searchParams.set("category", category);
-    url.searchParams.set("leftSSD", leftStorage === null ? "unknown" : String(leftStorage));
-    url.searchParams.set("rightSSD", rightStorage === null ? "unknown" : String(rightStorage));
+    for (const [side, id, storage] of [["left", leftId, leftStorage], ["right", rightId, rightStorage]] as const) {
+      if (id) { url.searchParams.set(side, id); url.searchParams.set(`${side}SSD`, storage === null ? "unknown" : String(storage)); }
+      else { url.searchParams.delete(side); url.searchParams.delete(`${side}SSD`); }
+    }
+    if (leftId || rightId || category !== "games") url.searchParams.set("category", category);
+    else url.searchParams.delete("category");
     if (taskId === "all") url.searchParams.delete("task"); else url.searchParams.set("task", taskId);
     window.history.replaceState(null, "", url);
   }, [leftId, rightId, leftStorage, rightStorage, category, taskId, ready]);
@@ -96,6 +99,7 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
   }
   function navigate(next: View) { setView(next); setMobileNav(false); window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" }); }
   async function share() {
+    if (!left || !right) return;
     const url = new URL(window.location.href);
     url.searchParams.set("left", leftId); url.searchParams.set("right", rightId); url.searchParams.set("category", category);
     url.searchParams.set("leftSSD", leftStorage === null ? "unknown" : String(leftStorage));
@@ -105,6 +109,7 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
     catch { setShareFallback(url.toString()); }
   }
   function exportCsv() {
+    if (!left || !right) return;
     const selectionData = datasetForSelections(data, [{ deviceId: leftId, storageGb: leftStorage }, { deviceId: rightId, storageGb: rightStorage }]);
     selectionData.workloads = workloads;
     const blob = new Blob([buildComparisonCsv(selectionData, selectionData.devices[0].id, selectionData.devices[1].id, category)], { type: "text/csv;charset=utf-8;" });
@@ -135,7 +140,7 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
     finally { setRefreshing(false); }
   }
 
-  if (!left || !right) return <main className="empty-state"><Layers3 size={32} /><h1>O catálogo está sendo preparado.</h1><p>Não há configurações disponíveis para comparar.</p></main>;
+  if (data.devices.length === 0) return <main className="empty-state"><Layers3 size={32} /><h1>O catálogo está sendo preparado.</h1><p>Não há configurações disponíveis para comparar.</p></main>;
 
   return <div className="app-shell">
     <a href="#main-content" className="skip-link">Pular para o conteúdo</a>
@@ -146,13 +151,19 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
       <nav aria-label="Navegação principal"><button className={view === "compare" ? "active" : ""} onClick={() => navigate("compare")}><BarChart3 size={19} /><span>Comparador</span><ChevronRight size={15} /></button><button className={view === "research" ? "active" : ""} onClick={() => navigate("research")}><Globe2 size={19} /><span>Explorar fontes</span></button><button className={view === "methodology" ? "active" : ""} onClick={() => navigate("methodology")}><BookOpen size={19} /><span>Metodologia</span></button></nav>
       <div className="sidebar-bottom"><div className="sidebar-note"><span className="sidebar-note-icon"><ShieldCheck size={21} /></span><strong>Menos achismo.<br />Mais evidência.</strong><p>Cada resultado tem uma fonte. Cada comparação tem contexto.</p><button onClick={() => navigate("methodology")}>Entenda os dados<ArrowUpRight size={14} /></button></div><a className="sidebar-github" href="https://github.com/Benfic4rthur/MacVersus" target="_blank" rel="noopener noreferrer"><GitBranch size={17} /><span>MacVersus no GitHub</span><ArrowUpRight size={14} /></a><span className="sidebar-version">Feito para escolher melhor. <span>v0.1</span></span></div>
     </aside>
-    <div className="app-main"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" onClick={() => setMobileNav(true)} aria-label="Abrir navegação" aria-expanded={mobileNav} aria-controls="app-navigation"><Menu size={21} /></button><span className="topbar-breadcrumb">MacVersus<ChevronRight size={13} /><strong>{view === "compare" ? "Comparador" : view === "research" ? "Explorar fontes" : "Metodologia"}</strong></span></div><div className="topbar-actions"><button className="icon-button" onClick={refreshData} disabled={refreshing} aria-label="Atualizar base de medições" title="Consultar a versão mais recente da base revisada"><RefreshCw size={16} className={refreshing ? "spinning" : ""} /></button><span className="evidence-status"><i />Fontes rastreáveis</span><button className="outline-button share-button" onClick={share}><Share2 size={15} /><span>Compartilhar</span></button></div></header>
+    <div className="app-main"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" onClick={() => setMobileNav(true)} aria-label="Abrir navegação" aria-expanded={mobileNav} aria-controls="app-navigation"><Menu size={21} /></button><span className="topbar-breadcrumb">MacVersus<ChevronRight size={13} /><strong>{view === "compare" ? "Comparador" : view === "research" ? "Explorar fontes" : "Metodologia"}</strong></span></div><div className="topbar-actions"><button className="icon-button" onClick={refreshData} disabled={refreshing} aria-label="Atualizar base de medições" title="Consultar a versão mais recente da base revisada"><RefreshCw size={16} className={refreshing ? "spinning" : ""} /></button><span className="evidence-status"><i />Fontes rastreáveis</span><button className="outline-button share-button" onClick={share} disabled={!left || !right}><Share2 size={15} /><span>Compartilhar</span></button></div></header>
       <main id="main-content" className={`content view-${view}`}>
         {staticPreview && <div className="preset-notice" role="note"><Info size={17} /><div><strong>{STATIC_PREVIEW_NOTICE}</strong></div></div>}
         {view === "compare" && <><section className="hero"><div><div className="section-eyebrow"><span className="beta-badge">BETA</span> COMPARAÇÃO DE CONFIGURAÇÕES</div><h1>Compare configurações<span>.</span></h1><p>Escolha chip, GPU, memória e SSD. Consulte os testes da sua tarefa, com a fonte ao lado.</p></div><div className="hero-data"><span className="hero-data-icon"><Layers3 size={23} /></span><div><strong>{data.devices.length}</strong><span>configurações no catálogo</span></div><div className="hero-data-divider" /><div><strong>{data.benchmarks.length}</strong><span>medições com fonte</span></div></div></section>
-          <section className="machine-comparison" aria-label="MacBooks selecionados"><DeviceCard device={left} side="left" onPick={() => setPicker("left")} storageGb={leftStorage} storageOptions={getStorageOptions(left)} onStorageChange={setLeftStorage} /><button className="swap-button" onClick={() => { setLeftId(rightId); setRightId(leftId); setLeftStorage(rightStorage); setRightStorage(leftStorage); }} aria-label="Trocar posições dos Macs" title="Trocar posições"><ArrowLeftRight size={20} /></button><DeviceCard device={right} side="right" onPick={() => setPicker("right")} storageGb={rightStorage} storageOptions={getStorageOptions(right)} onStorageChange={setRightStorage} /></section>
+          <section className="machine-comparison" aria-label="Escolha dos MacBooks">
+            {left ? <DeviceCard device={left} side="left" onPick={() => setPicker("left")} storageGb={leftStorage} storageOptions={getStorageOptions(left)} onStorageChange={setLeftStorage} /> : <EmptyDeviceCard side="left" onPick={() => setPicker("left")} />}
+            <button className="swap-button" disabled={!left || !right} onClick={() => { setLeftId(rightId); setRightId(leftId); setLeftStorage(rightStorage); setRightStorage(leftStorage); }} aria-label="Trocar posições dos Macs" title="Trocar posições"><ArrowLeftRight size={20} /></button>
+            {right ? <DeviceCard device={right} side="right" onPick={() => setPicker("right")} storageGb={rightStorage} storageOptions={getStorageOptions(right)} onStorageChange={setRightStorage} /> : <EmptyDeviceCard side="right" onPick={() => setPicker("right")} />}
+          </section>
           <div className="example-presets"><span>Experimente</span><button onClick={userExample}>Air M5 24 GB × M1 Max 64 GB</button><button onClick={maxExample}>M1 Max GPU 24 × M2 Max GPU 38</button><button onClick={setLlmPreset}>IA local com medições</button></div>
-          {(leftStorage !== leftBase?.storageGb || rightStorage !== rightBase?.storageGb) && <p className="configuration-note"><Info size={14} />SSD personalizado: só entram resultados medidos com essa capacidade. Testes de outro SSD não são reaproveitados.</p>}
+          {((leftBase && leftStorage !== leftBase.storageGb) || (rightBase && rightStorage !== rightBase.storageGb)) && <p className="configuration-note"><Info size={14} />SSD personalizado: só entram resultados medidos com essa capacidade. Testes de outro SSD não são reaproveitados.</p>}
+          {(!left || !right) && <p className="selection-hint" role="status">{!left && !right ? "Escolha os dois Macs para começar a comparação." : "Escolha o outro Mac para ver testes, preços e especificações."}</p>}
+          {left && right && <>
           <RadarProfile left={left} right={right} />
           <section className="results-section"><div className="results-heading"><div><div className="section-eyebrow">BENCHMARKS</div><h2>Resultados por tarefa.</h2></div><button className="text-button export-button" onClick={exportCsv}><Download size={16} />Exportar dados</button></div>
             <div className="results-toolbar"><div className="category-tabs" role="tablist" aria-label="Categoria de benchmark" onKeyDown={handleTabKey}>{categories.map(({ id, label, icon: Icon }) => <button role="tab" id={`tab-${id}`} aria-controls="benchmark-results" aria-selected={category === id} tabIndex={category === id ? 0 : -1} className={category === id ? "active" : ""} key={id} onClick={() => { setCategory(id); setTaskId("all"); setQuery(""); }}><Icon size={18} />{label}</button>)}</div><label className="search-field workload-search"><Search size={16} /><span className="sr-only">Filtrar testes</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filtrar testes..." />{query && <button onClick={() => setQuery("")} aria-label="Limpar filtro"><X size={14} /></button>}</label></div>
@@ -165,14 +176,15 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
           </section>
           <OffersPanel left={left} right={right} staticPreview={staticPreview} previewOffers={previewOffers} />
           <section className="specs-section"><div className="results-heading"><div><div className="section-eyebrow">FICHA TÉCNICA</div><h2>Especificações.</h2></div><span className="specs-origin"><CheckCheck size={15} />Especificações da Apple</span></div><SpecsTable left={left} right={right} /></section>
+          </>}
         </>}
-        {view === "research" && <><div className="research-selection-bar"><div><SlidersHorizontal size={17} /><span>Comparação atual</span></div><button onClick={() => setPicker("left")}><i className="dot-left" />{left.chip}<ChevronRight size={13} /></button><button onClick={() => setPicker("right")}><i className="dot-right" />{right.chip}<ChevronRight size={13} /></button><label><span className="sr-only">Categoria da pesquisa</span><select value={category} onChange={e => setCategory(e.target.value as Category)}>{categories.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label></div><ResearchPanel key={`${left.id}-${left.storageGb}-${right.id}-${right.storageGb}-${researchTerm}`} left={left} right={right} category={category} initialQuery={researchTerm} staticPreview={staticPreview} publishedData={data} /></>}
+        {view === "research" && <><div className="research-selection-bar"><div><SlidersHorizontal size={17} /><span>Comparação atual</span></div><button onClick={() => setPicker("left")}><i className="dot-left" />{left?.chip ?? "Escolher primeiro Mac"}<ChevronRight size={13} /></button><button onClick={() => setPicker("right")}><i className="dot-right" />{right?.chip ?? "Escolher segundo Mac"}<ChevronRight size={13} /></button><label><span className="sr-only">Categoria da pesquisa</span><select value={category} onChange={e => setCategory(e.target.value as Category)}>{categories.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label></div>{left && right ? <ResearchPanel key={`${left.id}-${left.storageGb}-${right.id}-${right.storageGb}-${researchTerm}`} left={left} right={right} category={category} initialQuery={researchTerm} staticPreview={staticPreview} publishedData={data} /> : <div className="empty-state"><Search size={29} /><h2>Quais Macs você quer pesquisar?</h2><p>Escolha os dois Macs acima para buscar fontes sobre suas configurações.</p></div>}</>}
         {view === "methodology" && <Methodology data={data} />}
         <footer className="page-footer"><span><span className="footer-mark">M</span>MacVersus <span>·</span> Comparações com fonte</span><span><Clock3 size={13} />Base revisada em {formatDate(data.updatedAt)}</span></footer>
       </main>
     </div>
     <DevicePicker devices={data.devices} measuredDeviceIds={measuredDeviceIds} selectedId={picker === "left" ? leftId : rightId} open={picker !== null} onClose={() => setPicker(null)} onSelect={id => chooseDevice(picker === "left" ? "left" : "right", id)} />
-    <Dialog open={!!selectedDetail} title={selectedDetail?.name ?? "Detalhes do teste"} onClose={() => setDetailId(null)} wide>{selectedDetail && <BenchmarkDetails workload={selectedDetail} left={left} right={right} data={data} />}</Dialog>
+    <Dialog open={!!selectedDetail && !!left && !!right} title={selectedDetail?.name ?? "Detalhes do teste"} onClose={() => setDetailId(null)} wide>{selectedDetail && left && right && <BenchmarkDetails workload={selectedDetail} left={left} right={right} data={data} />}</Dialog>
     <Dialog open={!!shareFallback} title="Compartilhar comparação" onClose={() => setShareFallback("")}><p className="dialog-description">Copie o link abaixo para abrir estes modelos e esta categoria.</p><label className="share-fallback-label">Link da comparação<input value={shareFallback} readOnly onFocus={event => event.target.select()} /></label></Dialog>
     <div className={`toast ${notice ? "toast-visible" : ""}`} role="status" aria-live="polite">{notice && <><Check size={16} />{notice}</>}</div>
   </div>;

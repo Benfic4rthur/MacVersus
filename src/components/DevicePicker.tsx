@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, Cpu, Laptop, Search, SlidersHorizontal } from "lucide-react";
+import { Check, ChevronDown, Cpu, Laptop, Plus, Search, SlidersHorizontal } from "lucide-react";
 import type { Device } from "@/lib/types";
 import { getDeviceImage } from "@/data/device-images";
 import { Dialog } from "./Dialog";
@@ -23,6 +23,17 @@ function DevicePhoto({ device }: { device: Device }) {
     <img src={publicAssetPath(image.src)} alt={image.alt} width={720} height={440} decoding="async" onError={() => setFailedSrc(image.src)} />
     <figcaption><a href={image.sourceUrl} target="_blank" rel="noopener noreferrer">{image.credit}</a></figcaption>
   </figure>;
+}
+
+export function EmptyDeviceCard({ side, onPick }: { side: "left" | "right"; onPick: () => void }) {
+  return <article className={`device-card device-${side} device-card-empty`}>
+    <div className="device-card-top"><span className="device-marker"><i />{side === "left" ? "CONFIGURAÇÃO A" : "CONFIGURAÇÃO B"}</span></div>
+    <button className="empty-device-pick" onClick={onPick} aria-label={side === "left" ? "Escolher primeiro Mac" : "Escolher segundo Mac"}>
+      <Laptop size={46} strokeWidth={1.1} aria-hidden="true" />
+      <strong>Nenhum Mac selecionado</strong><span>Escolha o modelo e a configuração.</span>
+      <span className="empty-device-action"><Plus size={16} />Escolher Mac</span>
+    </button>
+  </article>;
 }
 
 export function DeviceCard({ device, side, onPick, storageGb = device.storageGb, storageOptions = [], onStorageChange }: {
