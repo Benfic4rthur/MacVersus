@@ -12,7 +12,7 @@ import { RadarProfile } from "./RadarProfile";
 import { OffersPanel } from "./OffersPanel";
 import type { VerifiedOffer } from "@/lib/offer-types";
 import { publicAssetPath, STATIC_PREVIEW_NOTICE } from "@/lib/static-preview";
-import { datasetForSelections, getStorageOptions, parseStorageSelection, recordForConfiguration } from "@/lib/configuration";
+import { datasetForSelections, getStorageOptions, parseStorageSelection, recordForConfiguration, storageLabel } from "@/lib/configuration";
 
 type View = "compare" | "research" | "methodology";
 const categories = [
@@ -84,6 +84,7 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
   const getRecord = (device: Device | undefined, workloadId: string) => device ? recordForConfiguration(data, { deviceId: device.id, storageGb: device.storageGb }, workloadId) : undefined;
   const pairedCount = workloads.filter(w => getRecord(left, w.id) && getRecord(right, w.id)).length;
   const matchingRecords = workloads.flatMap(w => [getRecord(left, w.id), getRecord(right, w.id)]).filter(Boolean);
+  const hasStorageReferences = matchingRecords.some(record => Boolean(record?.storageReference));
   const selectedTask = data.workloads.find(w => w.id === taskId);
   const selectedDetail = data.workloads.find(w => w.id === detailId);
   const availableLlmPreset = data.devices.some(d => d.id === "mba13-m1-16") && data.devices.some(d => d.id === "mbp14-m1pro-16");
@@ -161,7 +162,7 @@ export function MacVersus({ data: initialData, staticPreview = false, previewOff
             {right ? <DeviceCard device={right} side="right" onPick={() => setPicker("right")} storageGb={rightStorage} storageOptions={getStorageOptions(right)} onStorageChange={setRightStorage} /> : <EmptyDeviceCard side="right" onPick={() => setPicker("right")} />}
           </section>
           <div className="example-presets"><span>Experimente</span><button onClick={userExample}>Air M5 24 GB × M1 Max 64 GB</button><button onClick={maxExample}>M1 Max GPU 24 × M2 Max GPU 38</button><button onClick={setLlmPreset}>IA local com medições</button></div>
-          {((leftBase && leftStorage !== leftBase.storageGb) || (rightBase && rightStorage !== rightBase.storageGb)) && <p className="configuration-note"><Info size={14} />SSD personalizado: só entram resultados medidos com essa capacidade. Testes de outro SSD não são reaproveitados.</p>}
+          {left && right && hasStorageReferences && <p className="configuration-note"><Info size={14} />FPS e tokens/s podem usar referências do mesmo modelo, chip, CPU, GPU e RAM com SSD diferente ou não informado. A capacidade da fonte aparece no teste.</p>}
           {(!left || !right) && <p className="selection-hint" role="status">{!left && !right ? "Escolha os dois Macs para começar a comparação." : "Escolha o outro Mac para ver testes, preços e especificações."}</p>}
           {left && right && <>
           <RadarProfile left={left} right={right} />
@@ -209,13 +210,13 @@ function BenchmarkDetails({ workload, left, right, data }: { workload: Workload;
   const comparison = compareBenchmarks(leftRecord, rightRecord, workload);
   return <><p className="dialog-description">{workload.description}</p><div className={`detail-comparability ${comparison.status}`}><Info size={17} /><p>{comparison.explanation}</p></div><div className="detail-columns">{([{ device: left, record: leftRecord, side: "left" }, { device: right, record: rightRecord, side: "right" }] as { device: Device; record?: Benchmark; side: string }[]).map(({ device, record, side }) => {
     const source = data.sources.find(s => s.id === record?.sourceId);
-    return <section className="detail-column" key={side}><div className="detail-device"><i className={`dot-${side}`} /><h3>{device.chip}</h3><span>{device.memoryGb} GB RAM</span></div>{record ? <><strong className="detail-value">{formatValue(record.value, workload.metric)}</strong><span className={`quality-label ${record.quality}`}>{record.quality === "documented" ? "Protocolo documentado" : "Condições parcialmente documentadas"}</span><p className="reported-hardware">{record.reportedHardware}</p><dl className="conditions-list">{Object.entries(record.conditions).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl>{record.missingFields.length > 0 && <div className="missing-fields"><strong>A fonte não informa</strong><p>{record.missingFields.join("; ")}.</p></div>}{record.notes && <p className="record-notes">{record.notes}</p>}{source && <div className="detail-source"><span>PUBLICAÇÃO ORIGINAL</span><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}<ExternalLink size={14} /></a><p>{source.publisher} · {formatDate(source.publishedAt)}</p><small>Consultada em {formatDate(source.accessedAt)}</small></div>}</> : <div className="detail-no-data"><Search size={23} /><h4>Ainda sem medição</h4><p>Não há um resultado publicado na base para esta configuração e este teste. Valores de outros Macs não foram usados como estimativa.</p></div>}</section>;
+    return <section className="detail-column" key={side}><div className="detail-device"><i className={`dot-${side}`} /><h3>{device.chip}</h3><span>{device.memoryGb} GB RAM</span></div>{record ? <><strong className="detail-value">{formatValue(record.value, workload.metric)}</strong><span className={`quality-label ${record.quality}`}>{record.quality === "documented" ? "Protocolo documentado" : "Condições parcialmente documentadas"}</span><p className="reported-hardware">{record.reportedHardware}</p>{record.storageReference && <div className="detail-storage-reference" role="note"><strong>Sobre o SSD deste teste</strong><dl><div><dt>SSD do teste</dt><dd>{record.storageReference.testedStorageGb === null ? "Não informado na fonte" : storageLabel(record.storageReference.testedStorageGb)}</dd></div><div><dt>SSD selecionado</dt><dd>{record.storageReference.selectedStorageGb === null ? "Não informado" : storageLabel(record.storageReference.selectedStorageGb)}</dd></div></dl><p>Mesmo modelo, ano, tamanho, chip, CPU, GPU e RAM. A medição original aparece como referência, sem estimar o efeito do SSD selecionado.</p></div>}<dl className="conditions-list">{Object.entries(record.conditions).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl>{record.missingFields.length > 0 && <div className="missing-fields"><strong>A fonte não informa</strong><p>{record.missingFields.join("; ")}.</p></div>}{record.notes && <p className="record-notes">{record.notes}</p>}{source && <div className="detail-source"><span>PUBLICAÇÃO ORIGINAL</span><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}<ExternalLink size={14} /></a><p>{source.publisher} · {formatDate(source.publishedAt)}</p><small>Consultada em {formatDate(source.accessedAt)}</small></div>}</> : <div className="detail-no-data"><Search size={23} /><h4>Ainda sem medição</h4><p>Não há um resultado publicado na base para esta configuração e este teste. Valores de outros Macs não foram usados como estimativa.</p></div>}</section>;
   })}</div></>;
 }
 
 function Methodology({ data }: { data: Dataset }) {
   const principles = [
-    { icon: Layers3, number: "01", title: "A configuração é exata.", text: "Chip, núcleos, memória, SSD e tamanho do Mac fazem parte do resultado. Uma medição de 16 GB não é atribuída automaticamente a um Mac de 32 GB." },
+    { icon: Layers3, number: "01", title: "O hardware acompanha o teste.", text: "Modelo, ano, tamanho, chip, CPU, GPU e RAM precisam coincidir. O SSD exato tem preferência. FPS de jogos e tokens/s podem usar outro SSD como referência identificada, sem estimar seu efeito. Aplicativos, testes de disco e ofertas mantêm a correspondência de SSD." },
     { icon: SlidersHorizontal, number: "02", title: "A tarefa precisa ser a mesma.", text: "Jogos exigem resolução e preset. IA exige modelo, quantização e runtime. Renderizações exigem a mesma cena, versão e método de execução." },
     { icon: FileCheck2, number: "03", title: "A origem fica à vista.", text: "Cada medição aponta para a publicação original. Dados ausentes continuam ausentes. O comparador não inventa FPS, tokens por segundo ou tempos." },
   ];

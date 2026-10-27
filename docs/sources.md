@@ -38,3 +38,5 @@ Todos os registros iniciais mantêm `quality: "partial"`, pois há condições n
 | MacBook Pro 16, M4 Pro e M4 Max | [2024](https://support.apple.com/en-us/121554) |
 
 As configurações M1 Pro e M1 Max com 32 GB não herdam os benchmarks das máquinas testadas de 16 GB e 64 GB. Nos relatos de LLMs, o SSD permanece `null`; a largura de banda do Air M1 também permanece `null`, pois não consta na ficha Apple usada. Os demais modelos do catálogo devem indicar sua própria ficha oficial.
+
+Ao selecionar outra capacidade de SSD, FPS e tokens/s do mesmo chip, CPU, GPU, RAM, família, ano e tela continuam disponíveis como referência. A interface informa a capacidade testada ou sua ausência na fonte. Isso preserva o hardware original, sem alterar o registro, estimar um novo resultado ou atribuir outra RAM. Se houver medição com a capacidade selecionada, ela tem prioridade. As demais métricas continuam exigindo correspondência de SSD.

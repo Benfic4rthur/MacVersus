@@ -42,6 +42,20 @@ test("equal measurements are a tie", () => {
   });
 });
 
+test("SSD references show published values without a winner, percentage or apparent tie", () => {
+  const throughput = { ...workload, category: "games" as const, metric: "fps" as const, higherIsBetter: true };
+  for (const testedStorageGb of [2048, null]) {
+    const reference = { ...sample, storageReference: { testedStorageGb, selectedStorageGb: 1024 } };
+    for (const [left, right] of [[reference, sample], [sample, reference], [reference, { ...reference, value: 200 }]]) {
+      const result = compareBenchmarks(left, right, throughput);
+      assert.equal(result.status, "partial");
+      assert.equal(result.percent, null);
+      assert.equal(result.winner, null);
+      assert.match(result.explanation, /SSD/u);
+    }
+  }
+});
+
 test("CSV includes provenance, escapes formulas and retains missing data", () => {
   const dataset: Dataset = {
     updatedAt: "2026-10-27", workloads: [workload], benchmarks: [{ ...sample, notes: '=HYPERLINK("https://example.com")' }],
@@ -53,4 +67,25 @@ test("CSV includes provenance, escapes formulas and retains missing data", () =>
   assert.ok(csv.includes("Sem dados"));
   assert.ok(csv.includes("'=HYPERLINK"));
   assert.ok(csv.startsWith("\uFEFF"));
+});
+
+test("CSV separates selected and tested SSD and preserves the real reported hardware", () => {
+  const throughput: Workload = { ...workload, category: "llms", metric: "tokens/s", higherIsBetter: true };
+  const fixture: Dataset = {
+    updatedAt: "2026-10-27", workloads: [throughput], benchmarks: [{
+      ...sample, reportedHardware: "M1 Pro, 32 GB RAM, SSD não informado",
+      storageReference: { testedStorageGb: null, selectedStorageGb: 1024 },
+    }],
+    sources: [{ id: "source", title: "Original test", publisher: "Original author", url: "https://example.com/original-test", publishedAt: "2025-01-01", accessedAt: "2026-10-27" }],
+    devices: [{ id: "a", name: "Mac", family: "MacBook Pro", year: 2021, chip: "M1 Pro", cpuCores: 10, gpuCores: 16, memoryGb: 32, storageGb: 1024, bandwidthGbps: 200, screenInches: 16, specUrl: "https://support.apple.com/" }],
+  };
+  const csv = buildComparisonCsv(fixture, "a", "missing-device", "llms");
+  assert.ok(csv.includes('"Hardware reportado","SSD testado (GB)","Aplicação do resultado"'));
+  assert.ok(csv.includes('"32","1024","llms"'));
+  assert.ok(csv.includes('"M1 Pro, 32 GB RAM, SSD não informado","Não informado","Referência de FPS/tokens/s; SSD diferente ou não informado; sem vantagem calculada"'));
+  assert.ok(csv.includes("https://example.com/original-test"));
+  const knownTestedSsd = { ...fixture, benchmarks: [{ ...fixture.benchmarks[0], storageReference: { testedStorageGb: 2048, selectedStorageGb: null } }] };
+  const unknownSelectionCsv = buildComparisonCsv(knownTestedSsd, "a", "missing-device", "llms");
+  assert.ok(unknownSelectionCsv.includes('"32","Não informado","llms"'));
+  assert.ok(unknownSelectionCsv.includes('","2048","Referência de FPS/tokens/s;'));
 });

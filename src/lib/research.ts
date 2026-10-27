@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import type { Category, Dataset, ResearchResponse, ResearchResult } from "./types";
-import { getStorageOptions, storageLabel } from "./configuration";
+import { getStorageOptions, recordForConfiguration, storageLabel } from "./configuration";
 
 const CATEGORIES = new Set<Category>(["games", "llms", "apps"]);
 const CATEGORY_TERMS: Record<Category, string> = {
@@ -131,7 +131,7 @@ function buildQuery(input: ResearchInput, data: Dataset): string {
     return { ...device, storageGb: input.storageGb ? input.storageGb[index] : device.storageGb };
   }).sort((a, b) => `${a.id}-${a.storageGb}`.localeCompare(`${b.id}-${b.storageGb}`));
   const hardware = devices.map((device) =>
-    `${device.family} ${device.screenInches} ${device.year} ${device.chip} ${device.gpuName ?? `${device.gpuCores ?? ""} GPU cores`} ${device.memoryGb}GB RAM${device.storageGb === null ? "" : ` ${storageLabel(device.storageGb)} SSD`}`,
+    `${device.family} ${device.screenInches} ${device.year} ${device.chip} ${device.gpuName ?? `${device.gpuCores ?? ""} GPU cores`} ${device.memoryGb}GB RAM${input.category !== "apps" || device.storageGb === null ? "" : ` ${storageLabel(device.storageGb)} SSD`}`,
   ).join(" vs ");
   return `${hardware} ${CATEGORY_TERMS[input.category]}${input.query ? ` ${input.query}` : ""}`;
 }
@@ -145,14 +145,16 @@ function searchLinks(query: string): ResearchResponse["searchLinks"] {
 
 function catalogResults(input: ResearchInput, data: Dataset): ResearchResult[] {
   const workloads = data.workloads.filter((workload) => workload.category === input.category);
-  const workloadIds = new Set(workloads.map((workload) => workload.id));
   const terms = normalizeText(input.query).split(/\s+/u).filter(Boolean);
-  const matches = data.benchmarks.filter((benchmark) => {
-    if (!input.deviceIds.includes(benchmark.deviceId) || !workloadIds.has(benchmark.workloadId)) return false;
-    if (input.storageGb) {
-      const original = data.devices.find(device => device.id === benchmark.deviceId)!;
-      if (!input.deviceIds.some((id, index) => id === benchmark.deviceId && input.storageGb![index] === original.storageGb)) return false;
-    }
+  const available = input.deviceIds.flatMap((deviceId, index) => {
+    const original = data.devices.find(device => device.id === deviceId)!;
+    const storageGb = input.storageGb ? input.storageGb[index] : original.storageGb;
+    return workloads.flatMap(workload => {
+      const record = recordForConfiguration(data, { deviceId, storageGb }, workload.id);
+      return record ? [record] : [];
+    });
+  });
+  const matches = [...new Map(available.map(record => [record.id, record])).values()].filter((benchmark) => {
     const source = data.sources.find((item) => item.id === benchmark.sourceId);
     const workload = workloads.find((item) => item.id === benchmark.workloadId);
     const searchable = normalizeText([

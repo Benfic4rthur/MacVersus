@@ -37,16 +37,30 @@ export function configurationDevice(data: Dataset, configuration: Configuration)
 
 export function recordForConfiguration(data: Dataset, configuration: Configuration, workloadId: string): Benchmark | undefined {
   const original = data.devices.find(item => item.id === configuration.deviceId);
-  // Unknown SSD is not interchangeable with a known one. A change in storage must
-  // never inherit an SSD or application result from the original test machine.
   if (!original) return undefined;
-  const exactIds = new Set(data.devices.filter(candidate => candidate.family === original.family
+  const matchingDevices = new Map(data.devices.filter(candidate => candidate.family === original.family
     && candidate.year === original.year && candidate.screenInches === original.screenInches
+    && (candidate.architecture ?? "apple-silicon") === (original.architecture ?? "apple-silicon")
     && candidate.chip === original.chip && candidate.cpuCores === original.cpuCores
     && candidate.gpuCores === original.gpuCores && candidate.gpuName === original.gpuName
-    && candidate.gpuMemoryGb === original.gpuMemoryGb && candidate.memoryGb === original.memoryGb
-    && candidate.storageGb === configuration.storageGb).map(candidate => candidate.id));
-  return data.benchmarks.find(item => exactIds.has(item.deviceId) && item.workloadId === workloadId);
+    && candidate.gpuMemoryGb === original.gpuMemoryGb && candidate.memoryGb === original.memoryGb)
+    .map(candidate => [candidate.id, candidate]));
+  const records = data.benchmarks.filter(item => matchingDevices.has(item.deviceId) && item.workloadId === workloadId);
+  const exact = records.find(item => matchingDevices.get(item.deviceId)!.storageGb === configuration.storageGb);
+  if (exact) return exact;
+
+  // Throughput may be shown as a reference for identical compute hardware. This
+  // does not claim that a different or unknown SSD was tested, or predict its result.
+  const workload = data.workloads.find(item => item.id === workloadId);
+  const permitsReference = workload && ((workload.category === "games" && workload.metric === "fps")
+    || (workload.category === "llms" && workload.metric === "tokens/s"));
+  if (!permitsReference) return undefined;
+  const reference = records.find(item => item.deviceId === original.id) ?? records[0];
+  if (!reference) return undefined;
+  return { ...reference, storageReference: {
+    testedStorageGb: matchingDevices.get(reference.deviceId)!.storageGb,
+    selectedStorageGb: configuration.storageGb,
+  } };
 }
 
 export function parseStorageSelection(value: string | null, device: Device): number | null {
@@ -56,7 +70,7 @@ export function parseStorageSelection(value: string | null, device: Device): num
   return getStorageOptions(device).includes(parsed) ? parsed : device.storageGb;
 }
 
-/** Export only records applicable to each selected SSD, including same-model pairs. */
+/** Export selected records with any SSD reference metadata, including same-model pairs. */
 export function datasetForSelections(data: Dataset, selections: Configuration[]): Dataset {
   const devices: Device[] = [];
   const benchmarks: Benchmark[] = [];

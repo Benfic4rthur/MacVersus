@@ -20,6 +20,10 @@ export function compareBenchmarks(
     return { status: "missing", percent: null, winner: null,
       explanation: "Não há valores válidos suficientes para esta comparação." };
   }
+  if (left.storageReference || right.storageReference) {
+    return { status: "partial", percent: null, winner: null,
+      explanation: "Há um resultado medido com SSD diferente ou não informado. O valor serve de referência para o mesmo CPU, GPU e RAM, sem calcular vantagem para os SSDs selecionados." };
+  }
   if (left.workloadId !== workload.id || right.workloadId !== workload.id
     || !left.comparabilityKey || left.comparabilityKey !== right.comparabilityKey
     || left.quality !== "documented" || right.quality !== "documented"
@@ -58,7 +62,7 @@ function csvCell(value: string | number): string {
 }
 
 export function buildComparisonCsv(dataset: Dataset, leftId: string, rightId: string, category: Category): string {
-  const header = ["Modelo", "Chip", "Ano", "CPU", "GPU", "RAM (GB)", "Armazenamento (GB)", "Categoria", "Teste", "Valor", "Unidade", "Condições", "Qualidade", "Informações ausentes", "Fonte", "URL", "Data da fonte", "Consulta", "Observações"];
+  const header = ["Modelo", "Chip", "Ano", "CPU", "GPU", "RAM (GB)", "Armazenamento (GB)", "Categoria", "Teste", "Valor", "Unidade", "Condições", "Qualidade", "Informações ausentes", "Fonte", "URL", "Data da fonte", "Consulta", "Observações", "Hardware reportado", "SSD testado (GB)", "Aplicação do resultado"];
   const rows: (string | number)[][] = [header];
   for (const deviceId of [leftId, rightId]) {
     const device = dataset.devices.find((entry) => entry.id === deviceId);
@@ -66,13 +70,17 @@ export function buildComparisonCsv(dataset: Dataset, leftId: string, rightId: st
     for (const workload of dataset.workloads.filter((entry) => entry.category === category)) {
       const records = dataset.benchmarks.filter((entry) => entry.deviceId === deviceId && entry.workloadId === workload.id);
       if (records.length === 0) {
-        rows.push([device.name, device.chip, device.year, device.cpuCores, device.gpuName ?? `${device.gpuCores ?? "Não informado"} núcleos`, device.memoryGb, device.storageGb ?? "Não informado", category, workload.name, "Sem dados", workload.metric, "", "Sem medição", "", "", "", "", dataset.updatedAt, "Não é uma estimativa."]);
+        rows.push([device.name, device.chip, device.year, device.cpuCores, device.gpuName ?? `${device.gpuCores ?? "Não informado"} núcleos`, device.memoryGb, device.storageGb ?? "Não informado", category, workload.name, "Sem dados", workload.metric, "", "Sem medição", "", "", "", "", dataset.updatedAt, "Não é uma estimativa.", "", "", "Sem medição"]);
       }
       for (const record of records) {
         const source = dataset.sources.find((entry) => entry.id === record.sourceId);
-        rows.push([device.name, device.chip, device.year, device.cpuCores, device.gpuName ?? `${device.gpuCores ?? "Não informado"} núcleos`, device.memoryGb, device.storageGb ?? "Não informado", category, workload.name, record.value, workload.metric,
+        const selectedStorage = record.storageReference ? record.storageReference.selectedStorageGb : device.storageGb;
+        const testedStorage = record.storageReference ? record.storageReference.testedStorageGb : device.storageGb;
+        rows.push([device.name, device.chip, device.year, device.cpuCores, device.gpuName ?? `${device.gpuCores ?? "Não informado"} núcleos`, device.memoryGb, selectedStorage ?? "Não informado", category, workload.name, record.value, workload.metric,
           Object.entries(record.conditions).map(([key, value]) => `${key}: ${value}`).join("; "),
-          record.quality, record.missingFields.join("; "), source?.publisher ?? "", source?.url ?? "", source?.publishedAt ?? "Não informada", source?.accessedAt ?? "", record.notes]);
+          record.quality, record.missingFields.join("; "), source?.publisher ?? "", source?.url ?? "", source?.publishedAt ?? "Não informada", source?.accessedAt ?? "", record.notes,
+          record.reportedHardware, testedStorage ?? "Não informado",
+          record.storageReference ? "Referência de FPS/tokens/s; SSD diferente ou não informado; sem vantagem calculada" : "Registro da configuração selecionada"]);
       }
     }
   }

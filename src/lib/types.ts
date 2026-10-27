@@ -52,6 +52,8 @@ export interface Benchmark {
   comparabilityKey: string | null;
   notes: string;
   reportedHardware: string;
+  // Runtime-only reference for FPS/tokens/s; never changes the tested hardware.
+  storageReference?: { testedStorageGb: number | null; selectedStorageGb: number | null };
 }
 
 export interface Dataset {

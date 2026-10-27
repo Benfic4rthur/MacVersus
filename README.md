@@ -29,7 +29,9 @@ Comparador de configurações de MacBooks, em português, com fotografias oficia
 
 Os números iniciais foram transcritos de testes do Notebookcheck e de relatos identificados na discussão de benchmarks do projeto llama.cpp. As especificações vêm de páginas oficiais da Apple. A base inclui publicações históricas, cuja data permanece visível; a data de consulta não representa uma nova execução do teste.
 
-Não há geração de FPS ou tokens/s por IA, extrapolação por núcleos de GPU, atribuição de testes de Mac Studio a MacBook Pro ou transferência automática de resultados entre configurações com RAM ou SSD diferentes. Um SSD não informado não equivale a um SSD de 1 TB. Também não há média global misturando jogos e aplicativos.
+Não há geração de FPS ou tokens/s por IA, extrapolação por núcleos de GPU, atribuição de testes de Mac Studio a MacBook Pro ou transferência automática de resultados entre configurações com RAM diferente. Chip, CPU, GPU, memória, família, ano e tamanho do Mac precisam corresponder. Também não há média global misturando jogos e aplicativos.
+
+Para **FPS e tokens/s**, a capacidade do SSD não bloqueia uma medição do mesmo hardware. Um teste com a capacidade selecionada tem prioridade; quando só há um teste com outro SSD ou SSD não informado, o número publicado aparece como referência, acompanhado da capacidade usada na fonte. O hardware original fica preservado nos detalhes e no CSV. Isso não transforma uma capacidade desconhecida em 1 TB nem cria uma nova medição. Testes de disco e dos demais aplicativos, assim como os anúncios de mercado, continuam exigindo correspondência de SSD.
 
 Crimson Desert, Xcode, DaVinci Resolve, Final Cut, exportação de dados e leitura/gravação de SSD já podem ser selecionados como alvos de pesquisa. A presença no seletor não afirma que exista um benchmark: esses protocolos novos começam sem medição revisada. As 23 medições iniciais são identificadas por máquina, unidade, data e condições; nenhuma delas é uma previsão para os Macs mais recentes.
 
@@ -67,7 +69,7 @@ Para gerar os arquivos estáticos:
 node scripts/build-preview.mjs
 ```
 
-O resultado fica em `docs/index.html` e seus arquivos associados, com base `/MacVersus/`. A fonte preparada para publicação é **Settings > Pages > Deploy from a branch > main > /docs**. A existência desses arquivos não significa que o Pages já esteja ativado. Consulte [a verificação e os limites da prévia](docs/verification.md).
+O resultado fica em `docs/index.html` e seus arquivos associados, com base `/MacVersus/`. A fonte de publicação é **Settings > Pages > Deploy from a branch > main > /docs**. A prévia está publicada em [benfic4rthur.github.io/MacVersus](https://benfic4rthur.github.io/MacVersus/). Consulte [a verificação e os limites da prévia](docs/verification.md).
 
 ## Pesquisa na internet
 
@@ -103,7 +105,7 @@ Não há workflows de CI ou GitHub Actions criados neste projeto. O código e a 
 | `src/lib/comparison.ts` | Regras de comparabilidade, unidades e CSV |
 | `src/lib/research.ts` | Validação, pesquisa externa, cache e proteção |
 | `src/lib/types.ts` | Contrato dos dados |
-| `src/lib/configuration.ts` | SSD, correspondência exata e capacidades do radar |
+| `src/lib/configuration.ts` | Correspondência de hardware, referências entre SSDs e capacidades do radar |
 | `src/lib/dataset-updates.ts` | Feed revisado, validação e atualização da base |
 | `src/lib/offers.ts` | Correspondência, validade, preços e atualização de anúncios |
 | `src/lib/offer-discovery.ts` | Descoberta opcional, limites e separação dos anúncios candidatos |

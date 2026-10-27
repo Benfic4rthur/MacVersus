@@ -11,8 +11,8 @@ export function publicAssetPath(path: string): string {
 }
 const normalized = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 const storageLabel = (size: number | null) => size === null ? "SSD não informado" : size >= 1024 ? `${size / 1024}TB SSD` : `${size}GB SSD`;
-function deviceQuery(device: Device) {
-  return `${device.family} ${device.screenInches} ${device.year} ${device.chip} CPU ${device.cpuCores} ${device.gpuCores === null ? device.gpuName ?? "" : `GPU ${device.gpuCores}`} ${device.memoryGb}GB RAM ${storageLabel(device.storageGb)}`;
+function deviceQuery(device: Device, includeStorage: boolean) {
+  return `${device.family} ${device.screenInches} ${device.year} ${device.chip} CPU ${device.cpuCores} ${device.gpuCores === null ? device.gpuName ?? "" : `GPU ${device.gpuCores}`} ${device.memoryGb}GB RAM${includeStorage ? ` ${storageLabel(device.storageGb)}` : ""}`;
 }
 export function staticResearch(data: Dataset, left: Device, right: Device, category: Category, term: string): ResearchResponse {
   const words = normalized(term).split(/\s+/).filter(Boolean);
@@ -27,10 +27,10 @@ export function staticResearch(data: Dataset, left: Device, right: Device, categ
       sourceWorkloads.set(record.sourceId, names);
     }
   }
-  const query = `${deviceQuery(left)} vs ${deviceQuery(right)} ${term.trim() || (category === "games" ? "gaming FPS benchmarks" : category === "llms" ? "LLM tokens per second benchmarks" : "render export benchmarks")}`;
+  const query = `${deviceQuery(left, category === "apps")} vs ${deviceQuery(right, category === "apps")} ${term.trim() || (category === "games" ? "gaming FPS benchmarks" : category === "llms" ? "LLM tokens per second benchmarks" : "render export benchmarks")}`;
   const results = data.sources.filter(source => sourceWorkloads.has(source.id)).map(source => ({
     title: source.title, url: source.url, publisher: source.publisher, publishedAt: source.publishedAt,
-    snippet: `Publicação presente na base para esta configuração. Testes: ${sourceWorkloads.get(source.id)!.join(", ")}. Consulte a fonte e as condições de cada medição.`,
+    snippet: `Publicação com medições para o hardware selecionado. Testes: ${sourceWorkloads.get(source.id)!.join(", ")}. Confira o SSD testado e as condições de cada medição no comparador.`,
   }));
   for (const workload of workloads) {
     if (!workload.sourceUrl || results.some(result => result.url === workload.sourceUrl)) continue;

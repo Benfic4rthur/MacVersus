@@ -244,6 +244,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .benchmark-right .bar-track { background: #f6f0e5; }
 .benchmark-right .bar-fill { background: #bd801c; }
 .bar-track.bar-empty { background: #fafbfc; border-color: #dfe5ec; }
+.benchmark-storage-reference { display: flex; align-items: center; gap: 5px; margin-top: 7px; color: #627183; font-size: 10px; line-height: 1.5; }
+.benchmark-storage-reference svg { color: #8795a6; }
+.detail-storage-reference { margin: 14px 0; padding: 12px; border: 1px solid #dfe6ee; border-radius: 7px; background: #f8fafc; }
+.detail-storage-reference > strong { color: #4b5e75; font-size: 11px; font-weight: 600; }
+.detail-storage-reference dl { display: grid; gap: 6px; margin: 10px 0; }
+.detail-storage-reference dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.detail-storage-reference dt { color: #627183; font-size: 10px; }
+.detail-storage-reference dd { margin: 0; color: #344b66; font-size: 11px; text-align: right; }
+.detail-storage-reference > p { color: #627183; font-size: 10px; line-height: 1.7; }
 .benchmark-card-foot { padding-bottom: 13px; }
 .direction-label { color: #86909d; font-size: 9px; }
 .benchmark-card-foot button { color: #275dcc; font-size: 10px; }

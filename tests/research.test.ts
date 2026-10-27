@@ -84,6 +84,18 @@ test("Intel discovery uses the real GPU name and release year instead of Apple G
   assert.doesNotMatch(result.query, /null|GPU cores/u);
 });
 
+test("benchmark discovery preserves FPS and tokens sources across SSD choices but keeps app tests exact", async () => {
+  for (const [category, metric, expected] of [["games", "fps", 1], ["llms", "tokens/s", 1], ["apps", "seconds", 0]] as const) {
+    const fixture: Dataset = { ...data, workloads: [{ ...data.workloads[0], category, metric }] };
+    const service = createResearchService({ data: fixture });
+    const result = await service.search({ category, deviceIds: ["mac-a"], storageGb: [512], query: "" });
+    assert.equal(result.results.length, expected, `${category}: source follows the comparison matching policy`);
+    if (category === "apps") assert.match(result.query, /512 GB SSD/u);
+    else assert.doesNotMatch(result.query, /SSD/u);
+    assert.match(result.query, /16GB RAM/u);
+  }
+});
+
 test("live provider request is server-only, bounded, cached and omits LLM answer generation", async () => {
   let calls = 0;
   const service = createResearchService({ data, apiKey: "test-secret", fetchImpl: stubFetch(async (url, init) => {

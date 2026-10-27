@@ -1,6 +1,6 @@
 # Verificação e limites desta versão
 
-Revisão: **27/10/2026**. Este registro descreve o que foi implementado e verificado. A preparação dos arquivos estáticos não confirma que o GitHub Pages esteja ativado.
+Revisão: **27/10/2026**. Este registro descreve o que foi implementado e verificado. O GitHub Pages está ativo em [benfic4rthur.github.io/MacVersus](https://benfic4rthur.github.io/MacVersus/).
 
 ## Cobertura dos dados
 
@@ -16,7 +16,7 @@ As contagens vêm de [catalog.ts](../src/data/catalog.ts), [catalog-devices.ts](
 
 As 23 medições iniciais possuem condições parcialmente documentadas. A interface mostra os valores publicados e suas limitações, sem declarar vencedor ou vantagem percentual. O radar representa capacidades de hardware, com uma escala por eixo; não é uma previsão de FPS, tokens/s ou tempo de exportação. Jogos em Boot Camp preservam esse ambiente, separado dos registros em macOS.
 
-GPU, RAM e SSD precisam corresponder à máquina testada. Um SSD desconhecido não equivale a uma capacidade selecionada pelo visitante. Modelos novos no catálogo não recebem automaticamente resultados de chips anteriores. As fontes e datas originais estão em [sources.md](sources.md).
+Chip, CPU, GPU, RAM, família, ano e tela precisam corresponder à máquina testada. Para FPS e tokens/s, um SSD diferente ou não informado não esconde a medição: o registro aparece como referência, com a capacidade testada identificada, e um teste com SSD correspondente tem prioridade. Essa referência não recebe vencedor nem vantagem percentual. Testes de disco e dos demais aplicativos continuam exigindo correspondência de SSD. Um SSD desconhecido não passa a ser tratado como uma capacidade conhecida. Modelos novos no catálogo não recebem automaticamente resultados de chips anteriores. As fontes e datas originais estão em [sources.md](sources.md).
 
 ## Verificações realizadas
 
@@ -27,6 +27,7 @@ GPU, RAM e SSD precisam corresponder à máquina testada. Um SSD desconhecido n�
 - Os testes cobrem comparabilidade, integridade das referências, configurações, atualizações da base, consultas de pesquisa e ofertas. As verificações específicas de ofertas incluem correspondência exata, preço à vista, ordenação, duplicação, validade, condição desconhecida, variantes e proteção de rede.
 - Os cinco anúncios cadastrados foram confrontados com suas configurações. A extração de preço e identidade foi validada nos HTMLs reais de duas páginas da Eletrohorse e de uma página do KaBuM.
 - A ampliação de marketplaces passou por 14 testes de ofertas e 7 de descoberta, com TypeScript validado. Os casos incluem SSD explicitamente desconhecido, filtro de condição antes do top 3, conflitos de hardware, URLs de anúncios, proteção de acesso, cache, limite de consultas, erros do provedor e expiração de preço em USD mesmo em cache. A Tavily foi simulada nesses testes.
+- A correção de correspondência de SSD passou pelos oito arquivos da suíte de testes, pela validação TypeScript e pela geração estática. No navegador, o M1 Max de 64 GB selecionado com SSD de 1 TB exibiu 97 FPS em Shadow of the Tomb Raider, identificando o SSD de 2 TB da fonte. Na comparação de Llama 2 Q4, os valores de 14,19 e 35,45 tokens/s permaneceram após selecionar 1 TB e 2 TB, com SSD da fonte explicitamente desconhecido. A abertura sem seleção também foi conferida. Os testes de regressão preservam a correspondência de CPU/GPU/RAM, priorizam SSD exato e mantêm testes de disco, aplicativos e ofertas estritos.
 
 **Limite da validação externa:** a tentativa de consultar a Eletrohorse diretamente pelo cliente HTTPS do Node retornou `EAI_AGAIN` na resolução DNS deste ambiente. O parser foi validado com HTML real previamente obtido, mas a atualização completa pela rede não foi confirmada aqui. A consulta paga da Tavily depende de credencial do administrador e foi testada com respostas controladas, sem consumo de uma conta externa.
 
@@ -60,8 +61,8 @@ A saída é preparada em `docs/index.html`, `docs/assets/`, `docs/images/`, `doc
 
 O modo estático não contém chaves, não consulta as rotas do Next.js e não apresenta uma recarga como nova verificação de loja. Depois que as ofertas do snapshot vencem, permanecem os links externos de pesquisa.
 
-### Fonte de publicação preparada
+### Fonte de publicação
 
-Em **Settings > Pages > Build and deployment**, a configuração correspondente aos arquivos deste projeto é **Source: Deploy from a branch**, **Branch: main**, **Folder: /docs**. A ativação e a URL publicada ainda precisam ser confirmadas nas configurações do GitHub. O endereço padrão esperado após a publicação é `https://benfic4rthur.github.io/MacVersus/`.
+Em **Settings > Pages > Build and deployment**, a configuração é **Source: Deploy from a branch**, **Branch: main**, **Folder: /docs**. A ativação foi confirmada nas configurações e a página pública foi aberta no navegador em `https://benfic4rthur.github.io/MacVersus/`.
 
 Nenhum workflow de CI ou de GitHub Actions foi criado no repositório para gerar essa prévia. O GitHub executa sua própria etapa interna de implantação do Pages, inclusive quando a fonte é uma branch. Consulte a [documentação oficial de publicação](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site) e a [descrição do serviço estático](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages).

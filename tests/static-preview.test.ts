@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { staticOfferDiscovery, staticOffers } from "../src/lib/static-preview";
+import { staticOfferDiscovery, staticOffers, staticResearch } from "../src/lib/static-preview";
 import { reviewedOfferCandidates } from "../src/data/offer-candidates";
 import type { VerifiedOffer } from "../src/lib/offer-types";
-import type { Device } from "../src/lib/types";
+import type { Dataset, Device } from "../src/lib/types";
 
 const now = Date.parse("2026-10-27T16:00:00Z");
 const device: Device = {
@@ -19,6 +19,24 @@ const offer: VerifiedOffer = {
   condition: "new", availability: "in-stock", verifiedAt: "2026-10-27T15:00:00Z",
   verification: "page-reviewed", evidence: "Synthetic testing evidence",
 };
+
+test("Pages research uses the same SSD policy as the comparison without changing source hardware", () => {
+  for (const [category, metric, expected] of [["games", "fps", 1], ["llms", "tokens/s", 1], ["apps", "MB/s", 0]] as const) {
+    const fixture: Dataset = {
+      updatedAt: "2026-10-27", devices: [device],
+      workloads: [{ id: "fixture-workload", category, name: "Fixture workload", subtitle: "Controlled test", metric, higherIsBetter: true, description: "Synthetic test fixture" }],
+      sources: [{ id: "fixture-source", title: "Fixture source", publisher: "Test publisher", url: "https://example.com/benchmark", publishedAt: "2026-10-27", accessedAt: "2026-10-27" }],
+      benchmarks: [{ id: "fixture-record", deviceId: device.id, workloadId: "fixture-workload", value: 10, sourceId: "fixture-source", conditions: {}, quality: "partial", missingFields: ["Runtime"], comparabilityKey: null, notes: "Test only", reportedHardware: "Test Mac with 1 TB SSD" }],
+    };
+    const selection = { ...device, storageGb: 512 };
+    const result = staticResearch(fixture, selection, selection, category, "");
+    assert.equal(result.results.length, expected);
+    if (category === "apps") assert.match(result.query, /512GB SSD/);
+    else assert.doesNotMatch(result.query, /SSD/);
+    assert.equal(fixture.devices[0].storageGb, 1024);
+    if (expected) assert.match(result.results[0].snippet, /SSD testado/);
+  }
+});
 
 test("static ranking keeps the latest price and cannot resurrect a sold-out observation", () => {
   const newer: VerifiedOffer = { ...offer, id: "fixture-newer", cashPrice: 10000,
